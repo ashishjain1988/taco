@@ -5,6 +5,8 @@ Copyright (C) 2012-2015 Matthew Iyer
 import os
 import collections
 import subprocess
+import multiprocessing
+import math
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2015"
@@ -17,13 +19,57 @@ __status__ = "Development"
 
 
 def sort_gtf(filename, output_file, tmp_dir=None):
-    args = ["sort"]
-    if tmp_dir is not None:
-        args.extend(["-T", tmp_dir])
-    args.extend(["-k1,1", "-k4,4n", "-k3,3r", filename])
-    myenv = os.environ.copy()
-    myenv["LC_ALL"] = "C"
-    return subprocess.call(args, stdout=open(output_file, "w"), env=myenv)
+    # Get number of lines in aggregated file
+    wc_process = subprocess.Popen(['wc', '-l', filename], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+    result, err = wc_process.communicate()
+    if (wc_process.returncode != 0):
+        raise IOError(err)
+
+    num_lines = int(result.strip().split()[0])
+    
+    # Split files into number of cores present and sort
+    if (multiprocessing.cpu_count() > 1):
+        num_split_lines = int(num_lines / (multiprocessing.cpu_count() - 1))
+        split_process = subprocess.Popen(['split', '-l', 
+            str(num_split_lines), 
+            str(filename), str(filename) + ".split."], stdout = subprocess.PIPE,
+            stderr = subprocess.PIPE)
+
+        result, err = split_process.communicate()
+        if (split_process.returncode != 0):
+            raise IOError(err)
+    
+        # multi-core sort
+        split_files = [f for f in os.listdir(os.path.dirname(os.path.abspath(filename))) if (".split." in f)]
+        sort_commands = []
+        for file in split_files:
+            sort_commands.append("sort -T " + str(tmp_dir) + " -k1,1 -k4,4n -k3,3r " + \
+                os.path.join(tmp_dir, str(file)) + " > " + os.path.join(tmp_dir, str(file) + ".sorted"))
+        
+        processes = [subprocess.Popen(cmd, shell=True) for cmd in sort_commands]
+
+        # wait for sorts to finish
+        for p in processes:
+            p.wait()
+
+        # merge
+        split_sorted_files = [os.path.join(os.path.dirname(os.path.abspath(filename)), f) for f in os.listdir(os.path.dirname(os.path.abspath(filename))) if (".sorted" in f)]
+        merge_process = subprocess.Popen("sort -k1,1 -k4,4n -k3,3r -m " + " ".join(split_sorted_files) + " > " + str(output_file), shell=True)
+        merge_process.wait()
+
+        # remove extraneous files
+        [os.remove(f) for f in split_sorted_files]
+
+        return 0
+    else:
+        # only 1 core, sort as usual.
+        args = ["sort"]
+        if tmp_dir is not None:
+            args.extend(["-T", tmp_dir])
+        args.extend(["-k1,1", "-k4,4n", "-k3,3r", filename])
+        myenv = os.environ.copy()
+        myenv["LC_ALL"] = "C"
+        return subprocess.call(args, stdout=open(output_file, "w"), env=myenv)
 
 
 class GTFError(Exception):
