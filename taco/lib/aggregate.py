@@ -5,11 +5,14 @@ Copyright (C) 2012-2015 Matthew Iyer
 import os
 import logging
 import collections
+import multiprocessing
+import re
 
 from base import Sample, TacoError
-from gtf import GTF, GTFError, sort_gtf
+from gtf import GTF, GTFError
 from stats import scoreatpercentile
 from caggregate import caggregate
+from csort import csort
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
@@ -20,33 +23,42 @@ __maintainer__ = "Yashar Niknafs"
 __email__ = "mkiyer@umich.edu"
 __status__ = "Development"
 
+def atoi(text):
+    return int(text) if text.isdigit() else text
+
+def natural_keys(text):
+    return [atoi(c) for c in re.split('(\d+)', text)]
 
 def aggregate(samples, ref_gtf_file, gtf_expr_attr, tmp_dir,
               output_gtf_file, stats_file):
     '''
     Aggregate/merge individual sample GTF files
     '''
-    # setup output files
-    tmp_file = os.path.join(tmp_dir, 'transcripts.unsorted.gtf')
+
+    num_of_files = 0
 
     # aggregate ref gtf
     if ref_gtf_file is not None:
+        tmp_ref_gtf_file = "transcripts." + str(num_of_files) + ".gtf"
+        num_of_files += 1
+        tmp_ref_file = os.path.join(tmp_dir, tmp_ref_gtf_file)
         logging.debug('Reference: %s' % ref_gtf_file)
         caggregate(ref_gtf_file, str(Sample.REF_ID), gtf_expr_attr,
-                   tmp_file, stats_file, str(True))
+                   tmp_ref_file, stats_file, str(True))
 
     # aggregate sample gtfs
     for sample in samples:
+
+        # Create new GTF transcript file names to prevent duplicates
+        tmp_gtf_file = "transcripts." + str(num_of_files) + ".gtf"
+        num_of_files += 1
+        tmp_gtf_fullpath = os.path.join(tmp_dir, tmp_gtf_file)
+
         logging.debug('Sample: %s %s' % (sample._id, sample.gtf_file))
         caggregate(sample.gtf_file, str(sample._id), gtf_expr_attr,
-                   tmp_file, stats_file, str(False))
+                   tmp_gtf_fullpath, stats_file, str(False))
 
-    # sort merged gtf
+    # merge sorted gtfs
     logging.info("Sorting GTF")
-    retcode = sort_gtf(tmp_file, output_gtf_file, tmp_dir=tmp_dir)
-    if retcode != 0:
-        logging.error("Error sorting GTF")
-        if os.path.exists(output_gtf_file):
-            os.remove(output_gtf_file)
-        raise TacoError('Error sorting GTF')
-    os.remove(tmp_file)
+    aggregated_gtf_files = sorted([os.path.join(tmp_dir, s) for s in os.listdir(tmp_dir) if (".DS" not in s)], key=natural_keys)
+    csort(aggregated_gtf_files, tmp_dir, multiprocessing.cpu_count())

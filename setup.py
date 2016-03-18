@@ -48,6 +48,7 @@ cython_extensions = [
 
 extensions = [
     Extension('taco.lib.caggregate', sources=['taco/lib/caggregate.c']),
+    Extension('taco.lib.csort', sources=['taco/lib/csort.c']),
     Extension('taco.lib.clocusindex',
               sources=['taco/lib/clocusindex.c',
                        'taco/lib/cgtf.c'],
