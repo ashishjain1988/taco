@@ -40,7 +40,7 @@ def sort_gtf(filename, output_file, tmp_dir=None):
             raise IOError(err)
     
         # multi-core sort
-        split_files = [f for f in os.listdir(os.path.dirname(os.path.abspath(filename))) if (".split." in f)]
+        split_files = [os.path.join(os.path.dirname(os.path.abspath(filename)), f) for f in os.listdir(os.path.dirname(os.path.abspath(filename))) if (".split." in f)]
         sort_commands = []
         for file in split_files:
             sort_commands.append("env LC_ALL=C sort -T " + str(tmp_dir) + " -k1 -k4n -k3r " + \
@@ -59,6 +59,7 @@ def sort_gtf(filename, output_file, tmp_dir=None):
 
         # remove extraneous files
         [os.remove(f) for f in split_sorted_files]
+        [os.remove(f) for f in split_files]
 
         return 0
     else:
