@@ -43,7 +43,7 @@ def sort_gtf(filename, output_file, tmp_dir=None):
         split_files = [f for f in os.listdir(os.path.dirname(os.path.abspath(filename))) if (".split." in f)]
         sort_commands = []
         for file in split_files:
-            sort_commands.append("sort -T " + str(tmp_dir) + " -k1,1 -k4,4n -k3,3r " + \
+            sort_commands.append("env LC_ALL=C sort -T " + str(tmp_dir) + " -k1 -k4n -k3r " + \
                 os.path.join(tmp_dir, str(file)) + " > " + os.path.join(tmp_dir, str(file) + ".sorted"))
         
         processes = [subprocess.Popen(cmd, shell=True) for cmd in sort_commands]
@@ -54,7 +54,7 @@ def sort_gtf(filename, output_file, tmp_dir=None):
 
         # merge
         split_sorted_files = [os.path.join(os.path.dirname(os.path.abspath(filename)), f) for f in os.listdir(os.path.dirname(os.path.abspath(filename))) if (".sorted" in f)]
-        merge_process = subprocess.Popen("sort -k1,1 -k4,4n -k3,3r -m " + " ".join(split_sorted_files) + " > " + str(output_file), shell=True)
+        merge_process = subprocess.Popen("env LC_ALL=C sort -k1 -k4n -k3r -m " + " ".join(split_sorted_files) + " > " + str(output_file), shell=True)
         merge_process.wait()
 
         # remove extraneous files
