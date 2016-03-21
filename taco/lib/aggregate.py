@@ -49,4 +49,3 @@ def aggregate(samples, ref_gtf_file, gtf_expr_attr, tmp_dir,
         if os.path.exists(output_gtf_file):
             os.remove(output_gtf_file)
         raise TacoError('Error sorting GTF')
-    os.remove(tmp_file)
