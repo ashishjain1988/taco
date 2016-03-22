@@ -281,8 +281,8 @@ static PyObject* py_caggregate(PyObject* self, PyObject* args) {
         return NULL;
     }
 
-    int aggregate_cpu_count = 8;
-    int sort_cpu_count = 52;
+    int aggregate_cpu_count = 4;
+    int sort_cpu_count = 6;
 
     int num_files = (int)PyList_Size(listObj);
     if (num_files <= 0) {
@@ -398,13 +398,70 @@ static PyObject* py_caggregate(PyObject* self, PyObject* args) {
     }
 
     // Final Merge
-    char* merge_command = (char*)calloc(num_files + 1, sizeof(file_status[0].sorted_gtf_filename) + 16);
-    sprintf(merge_command, "env LC_ALL=C sort -T %s -m -k1,1 -k4,4n -k3,3r -o %s/transfrags.gtf ", tmp_dir, tmp_dir);
-    unsigned long merge_command_length = strlen(merge_command);
-    for (uint32_t i = 0; i < num_files; i++) {
-        merge_command_length += sprintf(merge_command + merge_command_length, "%s ", file_status[i].sorted_gtf_filename);
+    memset(sort_thread_status, 0, sort_cpu_count * sizeof(Thread_arg_struct_t));
+    int num_layer_1_merge_files = num_files / sort_cpu_count;
+
+    // The thread_id indexing goes to -1 because the last sort thread needs to pick up the remainder
+    for (uint32_t thread_id = 0; thread_id < sort_cpu_count - 1; thread_id++) {
+
+        char* merge_command = (char*)calloc(num_layer_1_merge_files + 1, sizeof(file_status[0].sorted_gtf_filename) + 16);
+        sprintf(merge_command, "( env LC_ALL=C sort -T %s -m -k1,1 -k4,4n -k3,3r -o %s/merge.%u.gtf ", tmp_dir, tmp_dir, thread_id);
+        unsigned long merge_command_length = strlen(merge_command);
+        for (uint32_t i = (thread_id * num_layer_1_merge_files); i < ((thread_id * num_layer_1_merge_files) + num_layer_1_merge_files); i++) {
+            merge_command_length += sprintf(merge_command + merge_command_length, "%s ", file_status[i].sorted_gtf_filename);
+        }
+        merge_command_length += sprintf(merge_command + merge_command_length, "; rm ");
+        for (uint32_t i = (thread_id * num_layer_1_merge_files); i < ((thread_id * num_layer_1_merge_files) + num_layer_1_merge_files); i++) {
+            merge_command_length += sprintf(merge_command + merge_command_length, "%s ", file_status[i].sorted_gtf_filename);
+        }
+        merge_command_length += sprintf(merge_command + merge_command_length, ") &");
+        system(merge_command);
     }
 
+    // Get the last merge to pick up any remainders
+    char* merge_command = (char*)calloc(num_layer_1_merge_files * 2, sizeof(file_status[0].sorted_gtf_filename) + 16);
+    sprintf(merge_command, "( env LC_ALL=C sort -T %s -m -k1,1 -k4,4n -k3,3r -o %s/merge.%u.gtf ", tmp_dir, tmp_dir, sort_cpu_count - 1);
+    unsigned long merge_command_length = strlen(merge_command);
+    for (uint32_t i = ((sort_cpu_count - 1) * num_layer_1_merge_files); i < num_files; i++) {
+        merge_command_length += sprintf(merge_command + merge_command_length, "%s ", file_status[i].sorted_gtf_filename);
+    }
+    merge_command_length += sprintf(merge_command + merge_command_length, "; rm ");
+    for (uint32_t i = ((sort_cpu_count - 1) * num_layer_1_merge_files); i < num_files; i++) {
+        merge_command_length += sprintf(merge_command + merge_command_length, "%s ", file_status[i].sorted_gtf_filename);
+    }
+    merge_command_length += sprintf(merge_command + merge_command_length, ") &");
+    system(merge_command);
+
+    // Wait for 1st layer merge to finish
+    while (true) {
+        bool layer_1_merge_completed = true;
+        for (uint32_t i = 0; i < num_files; i++) {
+            if (access((char*)file_status[i].sorted_gtf_filename, F_OK) == -1) {
+                // File does not exist... Means that thread is done
+            } else {
+                layer_1_merge_completed = false;
+                break;
+            }
+
+        }
+
+        if (layer_1_merge_completed) {
+            break;
+        } else {
+            sleep(2);
+        }
+    }
+
+    // Final layer 2 merge.
+    sprintf(merge_command, "env LC_ALL=C sort -T %s -m -k1,1 -k4,4n -k3,3r -o %s/transfrags.gtf ", tmp_dir, tmp_dir);
+    merge_command_length = strlen(merge_command);
+    for (uint32_t i = 0; i < sort_cpu_count; i++) {
+        merge_command_length += sprintf(merge_command + merge_command_length, "%s/merge.%u.gtf ", tmp_dir, i);
+    }
+    merge_command_length += sprintf(merge_command + merge_command_length, "; rm ");
+    for (uint32_t i = 0; i < sort_cpu_count; i++) {
+        merge_command_length += sprintf(merge_command + merge_command_length, "%s/merge.%u.gtf ", tmp_dir, i);
+    }
     system(merge_command);
 
     free(file_status);
