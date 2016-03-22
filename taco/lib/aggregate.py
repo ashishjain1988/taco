@@ -38,17 +38,24 @@ def aggregate(samples, ref_gtf_file, gtf_expr_attr, tmp_dir,
     num_of_files = 0
 
     # aggregate ref gtf
+    '''
     if ref_gtf_file is not None:
         tmp_ref_gtf_file = "transcripts." + str(num_of_files) + ".gtf"
         num_of_files += 1
         tmp_ref_file = os.path.join(tmp_dir, tmp_ref_gtf_file)
         logging.debug('Reference: %s' % ref_gtf_file)
         caggregate(ref_gtf_file, str(Sample.REF_ID), gtf_expr_attr,
-                   tmp_ref_file, stats_file, str(True))
+                   tmp_ref_file, str(True))
+    '''
 
     # aggregate sample gtfs
-    for sample in samples:
+    input_filenames = [sample.gtf_file for sample in samples]
+    total_cpu_count = multiprocessing.cpu_count()
 
+    caggregate(input_filenames, gtf_expr_attr, tmp_dir, str(False), total_cpu_count)
+    sys.exit(1)
+
+    for sample in samples:
         # Create new GTF transcript file names to prevent duplicates
         tmp_gtf_file = "transcripts." + str(num_of_files) + ".gtf"
         num_of_files += 1
@@ -57,6 +64,10 @@ def aggregate(samples, ref_gtf_file, gtf_expr_attr, tmp_dir,
         logging.debug('Sample: %s %s' % (sample._id, sample.gtf_file))
         caggregate(sample.gtf_file, str(sample._id), gtf_expr_attr,
                    tmp_gtf_fullpath, stats_file, str(False))
+    sys.exit(1)
+    print("NEED TO TAKE CARE OF REF_GTF_FILE")
+    print("Need TO MAKE GOOD CPU SPLITS FOR AGGREGATE VS SORT")
+    sys.exit(1)
 
     # merge sorted gtfs
     logging.info("Sorting GTF")

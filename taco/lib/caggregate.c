@@ -7,11 +7,14 @@
 //
 //  TODO:
 //  Need to Relay Safety Checks on sizes of strings, etc.
+//  Need to implement locking on the thread checks.
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <pthread.h>
 
 #include <Python.h>
 
@@ -24,6 +27,9 @@
 #define MAX_GTF_LINE_SIZE (1024)
 #define MAX_TRANSCRIPT_ID_SIZE (256)
 
+// Maximum sie of filepaths including file
+#define MAX_FILEPATH_LENGTH (512)
+
 typedef struct Hash_node {
     uint32_t num_exons;
     uint32_t length;
@@ -31,6 +37,26 @@ typedef struct Hash_node {
     char* transcript_id;
     struct Hash_node* next;
 } Hash_node;
+
+typedef struct File_status_t {
+    char raw_gtf_filename[MAX_FILEPATH_LENGTH];
+    char aggregated_gtf_filename[MAX_FILEPATH_LENGTH];
+    char sorted_gtf_filename[MAX_FILEPATH_LENGTH];
+    char sample_id[16];
+    char* gtf_expr_attr;
+    char* is_ref;
+    volatile bool aggregate_started;
+    volatile bool aggregate_finished;
+    volatile bool sort_started;
+    volatile bool sort_finished;
+} File_status_t;
+
+typedef struct Thread_arg_struct_t {
+    pthread_t pthread;
+    volatile bool in_progress;
+    File_status_t* file_status;
+} Thread_arg_struct_t;
+
 
 /* This is an industry-standard implementation of the FNV-32bit hash */
 uint32_t fnv_32_str(char *str)
@@ -142,51 +168,41 @@ void free_all_hashtable_nodes(Hash_node* hash_table_root) {
     free(hash_table_root);
 }
 
-static PyObject* py_caggregate(PyObject* self, PyObject* args) {
-    char* gtf_file;
-    char* sample_id;
-    char* gtf_expr_attr;
-    char* output_file;
-    char* stats_file;
-    char* is_ref;
-
-    if (!PyArg_ParseTuple(args, "ssssss", &gtf_file, &sample_id, &gtf_expr_attr, &output_file, &stats_file, &is_ref)) {
-        return NULL;
-    }
-
+int aggregate_function(char* gtf_file, char* sample_id, char* gtf_expr_attr, char* output_file, char* is_ref) {
     size_t bufflen = MAX_GTF_LINE_SIZE;
     char* buffer = (char*)malloc(bufflen * sizeof(char));
     if (buffer == NULL) {
-        return NULL;
+        return 1;
     }
 
     unsigned long long cur_t_id = 1;
 
     FILE* gtf_file_handler = fopen(gtf_file, "r");
     if (gtf_file_handler == NULL) {
-        return NULL;
+        return 1;
     }
 
     FILE* output_file_handler = fopen(output_file, "a");
     if (output_file_handler == NULL) {
-        return NULL;
+        return 1;
     }
 
     Hash_node* t_dict = (Hash_node*)calloc(HASH_TABLE_SIZE, sizeof(Hash_node));
     if (t_dict == NULL) {
-        return NULL;
+        return 1;
     }
 
     while (getline(&buffer, &bufflen, gtf_file_handler) != -1) {
-        const char* seqname = strtok(buffer, "\t");
-        const char* source = strtok(NULL, "\t");
-        const char* feature = strtok(NULL, "\t");
-        const char* start = strtok(NULL, "\t");
-        const char* end = strtok(NULL, "\t");
-        const char* score = strtok(NULL, "\t");
-        const char* strand = strtok(NULL, "\t");
-        const char* frame = strtok(NULL, "\t");
-        const char* attribute = strtok(NULL, "\t");
+        char* saveptr;
+        const char* seqname = strtok_r(buffer, "\t", &saveptr);
+        const char* source = strtok_r(NULL, "\t", &saveptr);
+        const char* feature = strtok_r(NULL, "\t", &saveptr);
+        const char* start = strtok_r(NULL, "\t", &saveptr);
+        const char* end = strtok_r(NULL, "\t", &saveptr);
+        const char* score = strtok_r(NULL, "\t", &saveptr);
+        const char* strand = strtok_r(NULL, "\t", &saveptr);
+        const char* frame = strtok_r(NULL, "\t", &saveptr);
+        const char* attribute = strtok_r(NULL, "\t", &saveptr);
 
         // Get Transcript ID from attributes
         char* transcript_id_start_index = strstr(attribute, "transcript_id \"");
@@ -202,7 +218,7 @@ static PyObject* py_caggregate(PyObject* self, PyObject* args) {
             // Search for transcript_id in hashtable
             if (str_in_hashtable(t_dict, transcript_id)) {
                 printf("GTF %s transcript_id %s is not unique", gtf_file, transcript_id);
-                return NULL;
+                return 1;
             } else {
                 sprintf(id_string, "%s.T%llu", sample_id, cur_t_id);
                 cur_t_id++;
@@ -237,6 +253,163 @@ static PyObject* py_caggregate(PyObject* self, PyObject* args) {
     fclose(output_file_handler);
     free_all_hashtable_nodes(t_dict);
     free(buffer);
+
+    return 0;
+}
+
+void* aggregate_thread(void* packed_args) {
+    Thread_arg_struct_t* args = (Thread_arg_struct_t*)packed_args;
+    File_status_t* file_status = args->file_status;
+    if (aggregate_function(file_status->raw_gtf_filename, file_status->sample_id, file_status->gtf_expr_attr, file_status->aggregated_gtf_filename, file_status->is_ref) != 0) {
+        printf("Aggregate Function Failed\n");
+    }
+
+    args->in_progress = false;
+    file_status->aggregate_finished = true;
+    return NULL;
+}
+
+static PyObject* py_caggregate(PyObject* self, PyObject* args) {
+    PyObject* listObj;
+    PyObject* strObj;
+    char* gtf_expr_attr;
+    char* tmp_dir;
+    char* is_ref;
+    int cpu_count;
+
+    if (!PyArg_ParseTuple(args, "O!sssb", &PyList_Type, &listObj, &gtf_expr_attr, &tmp_dir, &is_ref, &cpu_count)) {
+        return NULL;
+    }
+
+    int aggregate_cpu_count = 8;
+    int sort_cpu_count = 52;
+
+    int num_files = (int)PyList_Size(listObj);
+    if (num_files <= 0) {
+        return NULL;
+    }
+
+    cpu_count--; // Account for this main thread.
+    if (cpu_count < 1) {
+        cpu_count = 1;
+    }
+
+    File_status_t* file_status = (File_status_t*)calloc(num_files, sizeof(File_status_t));
+    Thread_arg_struct_t* aggregate_thread_status = (Thread_arg_struct_t*)calloc(aggregate_cpu_count, sizeof(Thread_arg_struct_t));
+    Thread_arg_struct_t* sort_thread_status = (Thread_arg_struct_t*)calloc(sort_cpu_count, sizeof(Thread_arg_struct_t));
+
+    for (uint32_t i = 0; i < num_files; i++) {
+        strObj = PyList_GetItem(listObj, i);
+        char* input_filename = PyString_AsString(strObj);
+
+        char sample_id[16];
+        sprintf(sample_id, "%u", i);
+
+        char output_file[strlen(tmp_dir) + 32];
+        sprintf(output_file, "%s/transcripts.%u.gtf", tmp_dir, i);
+
+        char sorted_file[strlen(tmp_dir) + 64];
+        sprintf(sorted_file, "%s/transcripts.%u.sorted.gtf", tmp_dir, i);
+
+        strncpy(file_status[i].raw_gtf_filename, input_filename, MAX_FILEPATH_LENGTH);
+        strncpy(file_status[i].aggregated_gtf_filename, output_file, MAX_FILEPATH_LENGTH);
+        strncpy(file_status[i].sorted_gtf_filename, sorted_file, MAX_FILEPATH_LENGTH);
+        strncpy(file_status[i].sample_id, sample_id, 16);
+        file_status[i].gtf_expr_attr = gtf_expr_attr;
+        file_status[i].is_ref = is_ref;
+    }
+
+    while (true) {
+
+        for (uint32_t thread_id = 0; thread_id < aggregate_cpu_count; thread_id++) {
+            if (aggregate_thread_status[thread_id].in_progress == false) {
+                aggregate_thread_status[thread_id].in_progress = true;
+
+                bool new_thread_started = false;
+                for (uint32_t i = 0; i < num_files; i++) {
+                    if (file_status[i].aggregate_started == false) {
+                        file_status[i].aggregate_started = true;
+                        new_thread_started = true;
+
+                        aggregate_thread_status[thread_id].file_status = &file_status[i];
+                        if (pthread_create((pthread_t*)&aggregate_thread_status[thread_id].pthread, NULL, aggregate_thread, (void*)&aggregate_thread_status[thread_id])) {
+                            fprintf(stderr, "Error creating thread\n");
+                            return NULL;
+                        }
+                        break;
+                    }
+                }
+
+                if (new_thread_started == false) {
+                    aggregate_thread_status[thread_id].in_progress = false;
+                }
+            }
+        }
+
+        
+        for (uint32_t thread_id = 0; thread_id < sort_cpu_count; thread_id++) {
+            if (sort_thread_status[thread_id].in_progress == false) {
+                sort_thread_status[thread_id].in_progress = true;
+
+                bool new_thread_started = false;
+                for (uint32_t i = 0; i < num_files; i++) {
+                    if ((file_status[i].aggregate_finished) && (file_status[i].sort_started == false)) {
+                        file_status[i].sort_started = true;
+                        new_thread_started = true;
+
+                        sort_thread_status[thread_id].file_status = &file_status[i];
+                        char sort_command[2 * strlen(file_status[i].aggregated_gtf_filename) + strlen(file_status[i].sorted_gtf_filename) + 128];
+                        sprintf(sort_command, "( env LC_ALL=C sort -k1,1 -k4,4n -k3,3r -o %s %s ; rm %s ) &", file_status[i].sorted_gtf_filename, file_status[i].aggregated_gtf_filename, file_status[i].aggregated_gtf_filename);
+
+                        system(sort_command);
+                        break;
+                    }
+                }
+
+                if (new_thread_started == false) {
+                    sort_thread_status[thread_id].in_progress = false;
+                }
+            }
+        }
+        
+        for (uint32_t thread_id = 0; thread_id < sort_cpu_count; thread_id++) {
+            if (sort_thread_status[thread_id].in_progress == true) {
+                if ((sort_thread_status[thread_id].file_status->sort_started == true) && (access((char*)sort_thread_status[thread_id].file_status->aggregated_gtf_filename, F_OK) == -1)) {
+                    // original file doesn't exist anymore... the thread is done.
+                    sort_thread_status[thread_id].file_status->sort_finished = true;
+                    sort_thread_status[thread_id].in_progress = false;
+                }
+            }
+
+        }
+        
+        bool all_files_completed = true;
+        for (uint32_t i = 0; i < num_files; i++) {
+            if (file_status[i].sort_finished == false) {
+                all_files_completed = false;
+                break;
+            }
+        }
+        if (all_files_completed) {
+            break;
+        }
+
+        sleep(2);
+    }
+
+    // Final Merge
+    char* merge_command = (char*)calloc(num_files + 1, sizeof(file_status[0].sorted_gtf_filename) + 16);
+    sprintf(merge_command, "env LC_ALL=C sort -T %s -m -k1,1 -k4,4n -k3,3r -o %s/transfrags.gtf ", tmp_dir, tmp_dir);
+    unsigned long merge_command_length = strlen(merge_command);
+    for (uint32_t i = 0; i < num_files; i++) {
+        merge_command_length += sprintf(merge_command + merge_command_length, "%s ", file_status[i].sorted_gtf_filename);
+    }
+
+    system(merge_command);
+
+    free(file_status);
+    free(aggregate_thread_status);
+    free(sort_thread_status);
 
     // Return value -- returning "NULL" is an error
     return Py_BuildValue("i", 0);
