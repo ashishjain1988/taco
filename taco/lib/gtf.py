@@ -16,15 +16,29 @@ __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
 
 
-def sort_gtf(filename, output_file, tmp_dir=None):
-    args = ["sort"]
+def sort_gtf(input_args, filename, output_file, tmp_dir=None):
+    # check if parallel sort exists (GNU Coreutils 8.6+)
+    parallel_sort_cmd = False
+    with open(os.devnull, "w") as fnull:
+        if (subprocess.call(["echo", "1 2", "|", "gsort", "--parallel=2"], stdout=fnull, stderr=fnull) == 0):
+            parallel_sort_cmd = "gsort"
+
+        if (subprocess.call(["echo", "1 2", "|", "sort", "--parallel=2"], stdout=fnull, stderr=fnull) == 0):
+            parallel_sort_cmd = "sort"
+
+    args = []
+    if (parallel_sort_cmd == False):
+        args = ["sort"]
+    else:
+        args = [parallel_sort_cmd]
+
     if tmp_dir is not None:
         args.extend(["-T", tmp_dir])
+    args.extend(['--parallel=' + str(input_args.num_processes)])
     args.extend(["-k1,1", "-k4,4n", "-k3,3r", filename])
     myenv = os.environ.copy()
     myenv["LC_ALL"] = "C"
     return subprocess.call(args, stdout=open(output_file, "w"), env=myenv)
-
 
 class GTFError(Exception):
     pass

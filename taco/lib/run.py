@@ -369,7 +369,8 @@ class Run(object):
         a = self.args
         samples = self.samples
 
-        aggregate(samples,
+        aggregate(self.args,
+                  samples,
                   ref_gtf_file=a.ref_gtf_file,
                   gtf_expr_attr=a.gtf_expr_attr,
                   tmp_dir=r.tmp_dir,
