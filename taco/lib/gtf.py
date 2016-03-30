@@ -5,6 +5,7 @@ Copyright (C) 2012-2015 Matthew Iyer
 import os
 import collections
 import subprocess
+import logging
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2015"
@@ -16,29 +17,33 @@ __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
 
 
-def sort_gtf(input_args, filename, output_file, tmp_dir=None):
+def sort_gtf(filename, output_file, num_processes, tmp_dir=None):
     # check if parallel sort exists (GNU Coreutils 8.6+)
     parallel_sort_cmd = False
     with open(os.devnull, "w") as fnull:
-        if (subprocess.call(["echo", "1 2", "|", "gsort", "--parallel=2"], stdout=fnull, stderr=fnull) == 0):
-            parallel_sort_cmd = "gsort"
+        cmdline = 'echo "2 1" | %s --parallel=2'
+        if subprocess.call(cmdline % 'gsort', stdout=fnull, stderr=fnull, shell=True) == 0:
+            parallel_sort_cmd = 'gsort'
+        if subprocess.call(cmdline % 'sort', stdout=fnull, stderr=fnull, shell=True) == 0:
+            parallel_sort_cmd = 'sort'
 
-        if (subprocess.call(["echo", "1 2", "|", "sort", "--parallel=2"], stdout=fnull, stderr=fnull) == 0):
-            parallel_sort_cmd = "sort"
-
-    args = []
-    if (parallel_sort_cmd == False):
+    if not parallel_sort_cmd:
+        logging.warning('Command line "sort" command does not support '
+                        '--parallel flag. For improved performance, consider '
+                        'upgrading/installing the latest GNU coreutils to '
+                        'enable parallel sort.')
         args = ["sort"]
     else:
-        args = [parallel_sort_cmd]
+        logging.debug('Command line "sort" command supports --parallel')
+        args = [parallel_sort_cmd, '--parallel=%d' % num_processes]
 
     if tmp_dir is not None:
         args.extend(["-T", tmp_dir])
-    args.extend(['--parallel=' + str(input_args.num_processes)])
     args.extend(["-k1,1", "-k4,4n", "-k3,3r", filename])
     myenv = os.environ.copy()
     myenv["LC_ALL"] = "C"
     return subprocess.call(args, stdout=open(output_file, "w"), env=myenv)
+
 
 class GTFError(Exception):
     pass

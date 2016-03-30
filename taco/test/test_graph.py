@@ -2,10 +2,9 @@
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
 from taco.lib.graph import Graph
-from taco.lib.path_graph2 import PathGraphFactory
+from taco.lib.path_graph import PathGraphFactory
 
 from taco.test.base import read_single_locus
-
 
 def test_add_paths():
     G = Graph()
