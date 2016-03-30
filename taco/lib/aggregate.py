@@ -21,7 +21,7 @@ __email__ = "mkiyer@umich.edu"
 __status__ = "Development"
 
 
-def aggregate(samples, ref_gtf_file, gtf_expr_attr, tmp_dir,
+def aggregate(args, samples, ref_gtf_file, gtf_expr_attr, tmp_dir,
               output_gtf_file, stats_file):
     '''
     Aggregate/merge individual sample GTF files
@@ -43,7 +43,7 @@ def aggregate(samples, ref_gtf_file, gtf_expr_attr, tmp_dir,
 
     # sort merged gtf
     logging.info("Sorting GTF")
-    retcode = sort_gtf(tmp_file, output_gtf_file, tmp_dir=tmp_dir)
+    retcode = sort_gtf(args, tmp_file, output_gtf_file, tmp_dir=tmp_dir)
     if retcode != 0:
         logging.error("Error sorting GTF")
         if os.path.exists(output_gtf_file):
