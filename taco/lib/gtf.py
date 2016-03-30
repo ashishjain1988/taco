@@ -34,7 +34,7 @@ def sort_gtf(filename, output_file, num_processes, tmp_dir=None):
                         'enable parallel sort.')
         args = ["sort"]
     else:
-        logging.debug('Command line "sort" command supports --parallel')
+        logging.debug('Command line "sort" supports --parallel flag')
         args = [parallel_sort_cmd, '--parallel=%d' % num_processes]
 
     if tmp_dir is not None:
