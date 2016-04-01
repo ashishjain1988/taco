@@ -49,12 +49,17 @@ def main():
         if locus.name == locus_id:
             break
 
+    logging.info('locus: %s features: %d coords: %s:%d-%d' %
+                 (locus.name, locus.num_lines, locus.chrom,
+                  locus.start, locus.end))
+
     # extract gtf for locus
     with open(r.transfrags_gtf_file) as fh:
         fh.seek(locus.filepos)
         for i in xrange(locus.num_lines):
             print fh.next(),
 
+    logging.info('done.')
 
 if __name__ == '__main__':
     sys.exit(main())
