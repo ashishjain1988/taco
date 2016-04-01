@@ -20,7 +20,7 @@ __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
 __credits__ = ["Matthew Iyer", "Yashar Niknafs"]
 __license__ = "GPL"
-__version__ = "0.4.2"
+__version__ = "0.4.3"
 __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
@@ -532,8 +532,7 @@ def assemble_worker(state):
         locus = state.input_queue.get()
         if locus is None:
             break
-        transfrags = parse_gtf_locus(locus, gtf_fileh)
-        assemble_locus(locus, transfrags, state)
+        assemble_locus(locus, parse_gtf_locus(locus, gtf_fileh), state)
         state.input_queue.task_done()
     state.input_queue.task_done()
     # cleanup and close files
