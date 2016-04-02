@@ -216,11 +216,11 @@ def assemble_isoforms(sgraph, config):
                   'source_expr=%f' %
                   (genome_id_str, k, len(K), K.exprs[K.SOURCE_ID]))
     paths = []
-    # Check memory usage without find_paths code
-    # for kmer_path, expr in find_paths(K, config.path_frac, config.max_paths):
-    #     path = reconstruct_path(kmer_path, K, sgraph)
-    #     paths.append((path, expr))
+    for kmer_path, expr in find_paths(K, config.path_frac, config.max_paths):
+        path = reconstruct_path(kmer_path, K, sgraph)
+        paths.append((path, expr))
     logging.debug('%s isoforms: %d' % (genome_id_str, len(paths)))
+
     # build gene clusters
     clusters, filtered = Cluster.build(paths, min_frac=config.isoform_frac)
     logging.debug('%s gene clusters: %d filtered transfrags: %d' %
