@@ -220,6 +220,7 @@ def assemble_isoforms(sgraph, config):
         path = reconstruct_path(kmer_path, K, sgraph)
         paths.append((path, expr))
     logging.debug('%s isoforms: %d' % (genome_id_str, len(paths)))
+
     # build gene clusters
     clusters, filtered = Cluster.build(paths, min_frac=config.isoform_frac)
     logging.debug('%s gene clusters: %d filtered transfrags: %d' %

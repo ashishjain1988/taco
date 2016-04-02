@@ -1,8 +1,9 @@
 '''
-TACO: Transcriptome meta-assembly from RNA-Seq
+TACO: Transcriptome meta-assembly for RNA-Seq
 '''
 from cpython cimport array
 import array
+
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
@@ -18,25 +19,30 @@ __status__ = "Development"
 DEF MIN_SCORE = 1.0e-10
 
 
-def find_path(int[:] order, float[:] exprs, list succs,
-              int source, int sink):
-    cdef float[:] min_exprs
-    cdef float[:] sum_exprs
-    cdef int[:] lengths
-    cdef int[:] prevs
+cdef find_path(int* nodes, int nnodes,
+               float *exprs, list succs,
+               int n, int source, int sink):
+    cdef array.array int_array_template = array.array('i')
+    cdef array.array float_array_template = array.array('f')
+    cdef array.array min_exprs_arr, sum_exprs_arr, lengths_arr, prevs_arr
+    cdef float *min_exprs, *sum_exprs
+    cdef int *lengths, *prevs
     cdef float min_expr, sum_expr, new_min_expr, new_sum_expr
     cdef float new_avg_expr, cur_avg_expr
-    cdef int n, i, j, length, new_length, prev
+    cdef int x, i, j, length, new_length, prev
     cdef list path
-    cdef array.array int_array_template = array.array('i', [])
-    cdef array.array float_array_template = array.array('f', [])
+
+    # allocate data structures
+    min_exprs_arr = array.clone(float_array_template, n, zero=False)
+    sum_exprs_arr = array.clone(float_array_template, n, zero=False)
+    lengths_arr = array.clone(int_array_template, n, zero=False)
+    prevs_arr = array.clone(int_array_template, n, zero=False)
 
     # initialize data structures
-    n = exprs.shape[0]
-    min_exprs = array.clone(float_array_template, n, zero=False)
-    sum_exprs = array.clone(float_array_template, n, zero=False)
-    lengths = array.clone(int_array_template, n, zero=False)
-    prevs = array.clone(int_array_template, n, zero=False)
+    min_exprs = min_exprs_arr.data.as_floats
+    sum_exprs = sum_exprs_arr.data.as_floats
+    lengths = lengths_arr.data.as_ints
+    prevs = prevs_arr.data.as_ints
     for i in xrange(n):
         min_exprs[i] = MIN_SCORE
         sum_exprs[i] = MIN_SCORE
@@ -46,7 +52,8 @@ def find_path(int[:] order, float[:] exprs, list succs,
     sum_exprs[source] = exprs[source]
 
     # traverse nodes in topological sort order
-    for i in order:
+    for x in xrange(nnodes):
+        i = nodes[x]
         min_expr = min_exprs[i]
         sum_expr = sum_exprs[i]
         length = lengths[i]
@@ -90,25 +97,31 @@ def find_path(int[:] order, float[:] exprs, list succs,
 
 
 def find_paths(object G, float path_frac=0, int max_paths=0):
-    cdef int[:] order
-    cdef float[:] exprs
-    cdef list results
-    cdef int n, i, j, source, sink, iterations
+    cdef array.array nodes_arr, exprs_arr
+    cdef int *nodes
+    cdef float *exprs
+    cdef int nnodes, n
+    cdef int source, sink, iterations
     cdef float expr, lowest_expr
     cdef tuple path
+    cdef list results
 
     # don't run if all nodes are zero
     if G.exprs[G.SOURCE_ID] < MIN_SCORE:
         return []
 
     # initialize data structures
-    order = array.array('i', G.topological_sort())
-    exprs = array.array('f', G.exprs)
+    nodes_arr = array.array('i', G.topological_sort())
+    exprs_arr = array.array('f', G.exprs)
+    nodes = nodes_arr.data.as_ints
+    exprs = exprs_arr.data.as_floats
+    nnodes = len(nodes_arr)
+    n = len(exprs_arr)
     source = G.SOURCE_ID
     sink = G.SINK_ID
 
     # find highest scoring path
-    path, expr = find_path(order, exprs, G.succs, source, sink)
+    path, expr = find_path(nodes, nnodes, exprs, G.succs, n, source, sink)
     results = [(path, expr)]
 
     # define threshold score to stop producing paths
@@ -122,7 +135,7 @@ def find_paths(object G, float path_frac=0, int max_paths=0):
         if max_paths > 0 and iterations >= max_paths:
             break
         # find path
-        path, expr = find_path(order, exprs, G.succs, source, sink)
+        path, expr = find_path(nodes, nnodes, exprs, G.succs, n, source, sink)
         if expr <= lowest_expr:
             break
         # store path
