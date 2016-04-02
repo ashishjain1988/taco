@@ -14,5 +14,5 @@ def test_mannwhitneyu():
     x = [1, 2, 3, 4, 5]
     y = [6, 7, 8, 9, 10]
     p1 = scipy_mwu(x, y).pvalue
-    p2 = mwu(x, y).pvalue / 2.0
+    p2 = mwu(x, y).pvalue
     assert abs(p1 - p2) < 1e-5

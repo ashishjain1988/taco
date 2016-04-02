@@ -2,9 +2,7 @@
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
 from taco.lib.base import Strand
-from taco.lib.assemble import assemble_isoforms, Config
 from taco.lib.splice_graph import SpliceGraph
-from taco.lib.path_finder import find_paths
 from taco.lib.path_graph import PathGraphFactory, PathGraph
 from taco.lib.cpathfinder import find_paths
 
@@ -15,8 +13,9 @@ def test_empty_graph_bug():
     t_dict, locus = read_single_locus('empty_graph_bug.gtf')
     transfrags = locus.get_transfrags(Strand.POS)
     sgraph = SpliceGraph.create(transfrags)
-    isoforms = assemble_isoforms(sgraph, Config.defaults())
-    assert len(isoforms) == 0
+    pgf = PathGraphFactory(sgraph)
+    K, k = pgf.create_optimal()
+    assert K is None
 
 
 def test_path1():

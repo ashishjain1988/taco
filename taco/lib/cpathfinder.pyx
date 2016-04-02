@@ -1,5 +1,5 @@
 '''
-TACO: Transcriptome meta-assembly from RNA-Seq
+TACO: Transcriptome meta-assembly for RNA-Seq
 '''
 from cpython cimport array
 import array

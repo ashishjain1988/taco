@@ -9,9 +9,10 @@ import matplotlib.pyplot as plt
 from taco.lib.base import Strand, Exon
 from taco.lib.dtypes import FLOAT_DTYPE
 from taco.lib.splice_graph import SpliceGraph
+from taco.lib.path_graph import PathGraphFactory, reconstruct_path
+from taco.lib.cpathfinder import find_paths
 from taco.lib.cchangepoint import mse as mse_cython
 from taco.lib.changepoint import mse as mse_python, smooth, run_changepoint
-from taco.lib.assemble import assemble_isoforms
 from taco.lib.transfrag import Transfrag
 
 from taco.test.base import read_single_locus
@@ -209,12 +210,11 @@ def test_ccle55_cuff_noc2l():
     assert Exon(944278, 944321) in stop_nodes
 
     # ensure best path uses change points
-    config = Config.defaults()
-    config.max_paths = 1
-    gene_isoforms = assemble_isoforms(sgraph, config)
-    assert len(gene_isoforms) == 1
-    isoforms = gene_isoforms[0]
-    assert len(isoforms) == 1
-    isoform = isoforms[0]
-    assert isoform.path[0] == Exon(944321, 944800)
-    assert isoform.path[-1] == Exon(959214, 959316)
+    pgf = PathGraphFactory(sgraph)
+    pgraph, k = pgf.create_optimal()
+    paths = find_paths(pgraph, max_paths=1)
+    assert len(paths) == 1
+    path, expr = paths[0]
+    path = reconstruct_path(path, pgraph, sgraph)
+    assert path[0] == Exon(944321, 944800)
+    assert path[-1] == Exon(959214, 959316)
