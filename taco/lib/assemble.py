@@ -13,7 +13,7 @@ from taco.lib.base import Strand, Results
 from taco.lib.batch_sort import batch_sort, batch_merge
 from taco.lib.transfrag import Transfrag
 from taco.lib.locus import Locus
-from taco.lib.cpathfinder import find_paths
+from taco.lib.cpathfinder import cpathfinder
 from taco.lib.path_graph import PathGraphFactory, reconstruct_path
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
@@ -216,6 +216,23 @@ def assemble_isoforms(sgraph, config):
                   'source_expr=%f' %
                   (genome_id_str, k, len(K), K.exprs[K.SOURCE_ID]))
     paths = []
+    print "K.exprs[K.SOURCE_ID]: ",
+    print K.exprs[K.SOURCE_ID]
+
+    print "K.topological_sort(): ",
+    print K.topological_sort()
+
+    print "K.exprs: ",
+    print K.exprs
+
+    print "K.succs: ",
+    print K.succs
+
+    print cpathfinder(K.exprs[K.SOURCE_ID], K.topological_sort(), K.exprs, K.succs, config.path_frac, config.max_paths, K.SOURCE_ID, K.SINK_ID)
+    sys.exit(1)
+    return
+
+    '''
     for kmer_path, expr in find_paths(K, config.path_frac, config.max_paths):
         path = reconstruct_path(kmer_path, K, sgraph)
         paths.append((path, expr))
@@ -235,6 +252,7 @@ def assemble_isoforms(sgraph, config):
             isoforms = isoforms[:config.max_isoforms]
         gene_isoforms.append(isoforms)
     return gene_isoforms
+    '''
 
 
 def assemble_gene(sgraph, locus_id_str, config):
