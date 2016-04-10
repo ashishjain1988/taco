@@ -11,16 +11,12 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 #include <stdbool.h>
-
 #include <Python.h>
 
-// Industry-standard FNV-32bit prime and offset
-#define FNV_32_PRIME ((uint32_t)0x01000193)
-#define FNV_32_OFFSET (2166136261U)
+#include "klib/khash.h"
 
-// Hash table size is 2^22 * sizeof(Hash_node) ~100mb
-#define HASH_TABLE_SIZE (4194304)
 #define MAX_GTF_LINE_SIZE (1024)
 #define MAX_TRANSCRIPT_ID_SIZE (256)
 
@@ -29,117 +25,61 @@ typedef struct Hash_node {
     uint32_t length;
     char* id;
     char* transcript_id;
-    struct Hash_node* next;
 } Hash_node;
 
-/* This is an industry-standard implementation of the FNV-32bit hash */
-uint32_t fnv_32_str(char *str)
-{
-    unsigned char *s = (unsigned char *)str;
-    uint32_t hval = FNV_32_OFFSET;
+KHASH_MAP_INIT_STR(aggregate_hash, Hash_node*)
 
-    while (*s) {
-        hval += (hval<<1) + (hval<<4) + (hval<<7) + (hval<<8) + (hval<<24);
-        hval ^= (uint32_t)*s++;
-    }
+bool str_in_hashtable(khash_t(aggregate_hash)* hash_table, const char* str) {
+    khint_t potential_bucket_id = kh_get(aggregate_hash, hash_table, str);
 
-    return hval % HASH_TABLE_SIZE;
-}
-
-bool str_in_hashtable(Hash_node* hash_table_root,char* str) {
-    Hash_node bucket = hash_table_root[fnv_32_str(str)];
-
-    if (bucket.transcript_id == NULL) {
+    if (potential_bucket_id == kh_end(hash_table)) {
         return false;
     }
 
-    if (strcmp(bucket.transcript_id, str) == 0) {
-        return true;
-    }
-
-    while (bucket.next != NULL) {
-        if (strcmp(bucket.transcript_id, str) == 0) {
-            return true;
-        }
-
-        bucket = *bucket.next;
-    }
-
-    return false;
+    return true;
 }
 
-void add_bucket_to_hashtable(Hash_node* hash_table_root,
-                             char* transcript_string,
-                             char* id_string) {
+void add_bucket_to_hashtable(khash_t(aggregate_hash)* hash_table, const char* transcript_string, const char* id_string) {
     char* allocated_transcript_string = strdup(transcript_string);
     char* allocated_id_string = strdup(id_string);
-    uint32_t hash_value = fnv_32_str(transcript_string);
 
-    if (hash_table_root[hash_value].transcript_id == '\0') {
-        // add to initial bucket
-        hash_table_root[hash_value].transcript_id = allocated_transcript_string;
-        hash_table_root[hash_value].id = allocated_id_string;
-        hash_table_root[hash_value].num_exons = 0;
-        hash_table_root[hash_value].length = 0;
-        hash_table_root[hash_value].next = NULL;
-    } else {
-        // add to linked list
-        Hash_node* bucket = &hash_table_root[hash_value];
-        while (bucket->next != NULL) {
-            bucket = bucket->next;
-        }
+    Hash_node* new_hash_node = (Hash_node*)malloc(sizeof(Hash_node));
+    new_hash_node->num_exons = 0;
+    new_hash_node->length = 0;
+    new_hash_node->transcript_id = allocated_transcript_string;
+    new_hash_node->id = allocated_id_string;
 
-        Hash_node* new_hash_node = (Hash_node*)malloc(sizeof(Hash_node));
-        new_hash_node->num_exons = 0;
-        new_hash_node->length = 0;
-        new_hash_node->next = NULL;
-        new_hash_node->transcript_id = allocated_transcript_string;
-        new_hash_node->id = allocated_id_string;
-
-        bucket->next = new_hash_node;
+    int ret = -1;
+    khint_t bucket_id = kh_put(aggregate_hash, hash_table, allocated_transcript_string, &ret);
+    if (ret != 1) {
+        printf("CAGGREGATE.C ERROR %d: Could not add new node to hashtable\n", ret);
     }
+
+    kh_val(hash_table, bucket_id) = new_hash_node;
 }
 
-char* increment_node_and_return_id(Hash_node* hash_table_root, char* transcript_id, uint32_t length_increment) {
-    Hash_node bucket = hash_table_root[fnv_32_str(transcript_id)];
-
-    if (strcmp(bucket.transcript_id, transcript_id) == 0) {
-        // Have the correct bucket.
-    } else {
-        while (strcmp(bucket.transcript_id, transcript_id) != 0) {
-            bucket = *(bucket.next);
-        }
+char* increment_node_and_return_id(khash_t(aggregate_hash)* hash_table, const char* transcript_id, const uint32_t length_increment) {
+    khint_t potential_bucket_id = kh_get(aggregate_hash, hash_table, transcript_id);
+    if (potential_bucket_id == kh_end(hash_table)) {
+        return NULL;
     }
 
-    bucket.num_exons += 1;
-    bucket.length += length_increment;
+    Hash_node* node = (Hash_node*)kh_val(hash_table, potential_bucket_id);
+    node->num_exons += 1;
+    node->length += length_increment;
 
-    return bucket.id;
+    return node->id;
 }
 
-void free_all_hashtable_nodes(Hash_node* hash_table_root) {
-    uint32_t i;
-    for (i = 0; i < HASH_TABLE_SIZE; i++) {
-        Hash_node* temp = &hash_table_root[i];
+void free_all_hashtable_nodes(khash_t(aggregate_hash)* hash_table) {
+    Hash_node* node;
+    kh_foreach_value(hash_table, node, {
+        free(node->transcript_id);
+        free(node->id);
+        free(node);
+    });
 
-        if (temp->transcript_id != NULL) {
-            free(temp->transcript_id);
-            free(temp->id);
-        }
-
-        // Jump past first bucket -- allocated all at once in beginning
-        temp = temp->next;
-
-        while (temp != NULL) {
-            Hash_node* temp_next = temp->next;
-            free(temp->transcript_id);
-            free(temp->id);
-            free(temp);
-            temp = temp_next;
-        }
-    }
-
-    free(hash_table_root);
+    kh_destroy(aggregate_hash, hash_table);
 }
 
 static PyObject* py_caggregate(PyObject* self, PyObject* args) {
@@ -172,10 +112,9 @@ static PyObject* py_caggregate(PyObject* self, PyObject* args) {
         return NULL;
     }
 
-    Hash_node* t_dict = (Hash_node*)calloc(HASH_TABLE_SIZE, sizeof(Hash_node));
-    if (t_dict == NULL) {
-        return NULL;
-    }
+    khash_t(aggregate_hash)* hash_table;
+    hash_table = kh_init(aggregate_hash);
+    //kh_resize(aggregate_hash, hash_table, 1024);
 
     while (getline(&buffer, &bufflen, gtf_file_handler) != -1) {
         const char* seqname = strtok(buffer, "\t");
@@ -200,14 +139,14 @@ static PyObject* py_caggregate(PyObject* self, PyObject* args) {
             char id_string[MAX_TRANSCRIPT_ID_SIZE];
 
             // Search for transcript_id in hashtable
-            if (str_in_hashtable(t_dict, transcript_id)) {
+            if (str_in_hashtable(hash_table, transcript_id)) {
                 printf("GTF %s transcript_id %s is not unique", gtf_file, transcript_id);
                 return NULL;
             } else {
                 sprintf(id_string, "%s.T%llu", sample_id, cur_t_id);
                 cur_t_id++;
 
-                add_bucket_to_hashtable(t_dict, transcript_id, id_string);
+                add_bucket_to_hashtable(hash_table, transcript_id, id_string);
             }
 
             if (strcmp(is_ref, "True") == 0) {
@@ -228,14 +167,14 @@ static PyObject* py_caggregate(PyObject* self, PyObject* args) {
             }
 
         } else if (strcmp(feature, "exon") == 0) {
-            char* id_string  = increment_node_and_return_id(t_dict, transcript_id, (uint32_t) (strtoul(end, NULL, 0) - strtoul(start, NULL, 0)));
+            char* id_string  = increment_node_and_return_id(hash_table, transcript_id, (uint32_t) (strtoul(end, NULL, 0) - strtoul(start, NULL, 0)));
             fprintf(output_file_handler, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\ttranscript_id \"%s\";\n", seqname, source, feature, start, end, score, strand, frame, id_string);
         }
     }
 
     fclose(gtf_file_handler);
     fclose(output_file_handler);
-    free_all_hashtable_nodes(t_dict);
+    free_all_hashtable_nodes(hash_table);
     free(buffer);
 
     // Return value -- returning "NULL" is an error
