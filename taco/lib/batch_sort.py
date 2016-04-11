@@ -15,6 +15,32 @@ import heapq
 
 Keyed = namedtuple("Keyed", ["key", "obj"])
 
+# batch sort configuration
+SORT_BUFFER_SIZE = 32000
+
+
+def sort_key_bed(line):
+    fields = line.split('\t', 2)
+    return (fields[0], int(fields[1]))
+
+
+def sort_key_gtf(line):
+    fields = line.split('\t', 4)
+    feature_key = 0 if fields[2] == 'transcript' else 1
+    return (fields[0], int(fields[3]), feature_key)
+
+
+def merge_files(input_files, output_file, key, header=None):
+    fhs = [open(f, 'rb', 64*1024) for f in input_files]
+    with open(output_file, 'wb', 64*1024) as output:
+        if header is not None:
+            output.write(header)
+        iterator = batch_merge(key, *fhs)
+        output.writelines(iterator)
+    for fh in fhs:
+        fh.close()
+
+
 def batch_merge(key=None, *iterables):
     # based on code posted by Scott David Daniels in c.l.p.
     # http://groups.google.com/group/comp.lang.python/msg/484f01f1ea3c832d

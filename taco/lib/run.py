@@ -14,15 +14,15 @@ import shutil
 
 from base import Sample, Results
 from locus import Locus
-from aggregate import aggregate
+from aggregate import aggregate_parallel
 from assemble import assemble_parallel
-from clocusindex import gtf_index_loci
+from clocusindex import bed_index_loci
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2015"
 __credits__ = ["Matthew Iyer", "Yashar Niknafs"]
 __license__ = "GPL"
-__version__ = "0.4.4"
+__version__ = "0.4.5"
 __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
@@ -39,6 +39,7 @@ class Args:
     MIN_EXPR = 0.5
     ISOFORM_FRAC = 0.05
     MAX_ISOFORMS = 0
+    ASSEMBLE_UNSTRANDED = False
     CHANGE_POINT = True
     CHANGE_POINT_PVALUE = 0.001
     CHANGE_POINT_FOLD_CHANGE = 0.85
@@ -133,6 +134,16 @@ class Args:
                             action='store_true',
                             default=Args.RESUME,
                             help='resume a previous run in <dir>')
+        parser.add_argument('--assemble-unstranded',
+                            dest='assemble_unstranded',
+                            action='store_true',
+                            default=Args.ASSEMBLE_UNSTRANDED,
+                            help='Enable assembly of unstranded transfrags '
+                            '[default=%(default)s]')
+        parser.add_argument('--no-assemble-unstranded',
+                            dest='assemble_unstranded',
+                            action='store_false',
+                            help='Disable assembly of unstranded transfrags')
         parser.add_argument('--change-point', dest='change_point',
                             action='store_true',
                             default=Args.CHANGE_POINT,
@@ -218,6 +229,7 @@ class Args:
         func(fmt.format('GTF expression attribute:', args.gtf_expr_attr))
         func(fmt.format('isoform fraction:', args.isoform_frac))
         func(fmt.format('max_isoforms:', args.max_isoforms))
+        func(fmt.format('assemble_unstranded:', args.assemble_unstranded))
         func(fmt.format('change point:', str(args.change_point)))
         func(fmt.format('change point pvalue:', str(args.change_point_pvalue)))
         func(fmt.format('change point fold change:',
@@ -365,27 +377,16 @@ class Run(object):
         '''
         Aggregate/merge individual sample GTF files
         '''
-        r = self.results
-        a = self.args
-        samples = self.samples
-
-        aggregate(self.args,
-                  samples,
-                  ref_gtf_file=a.ref_gtf_file,
-                  gtf_expr_attr=a.gtf_expr_attr,
-                  tmp_dir=r.tmp_dir,
-                  output_gtf_file=r.transfrags_gtf_file,
-                  stats_file=r.aggregate_stats_file)
-
+        aggregate_parallel(self.samples, self.args, self.results)
         # update status and write to file
         self.status.aggregate = True
         self.status.write(self.results.status_file)
 
     def index_loci(self):
         r = self.results
-        retcode = gtf_index_loci(r.transfrags_gtf_file, r.locus_index_file)
+        retcode = bed_index_loci(r.transfrags_bed_file, r.locus_index_file)
         if retcode != 0:
-            raise TacoError('Error indexing gtf file')
+            raise TacoError('Error indexing bed file')
         # update status and write to file
         self.status.index_loci = True
         self.status.write(self.results.status_file)

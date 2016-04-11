@@ -4,7 +4,7 @@ TACO: Transcriptome meta-assembly from RNA-Seq
 import collections
 import logging
 
-from base import Exon, Strand
+from base import Exon, Strand, Sample
 from gtf import GTF, GTFError
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
@@ -73,6 +73,53 @@ class Transfrag(object):
             return self.exons[0][0]
         else:
             return self.exons[-1][1]
+
+    def to_bed(self):
+        tx_start = self.exons[0].start
+        tx_end = self.exons[-1].end
+        block_sizes = []
+        block_starts = []
+        for e in self.exons:
+            block_starts.append(e.start - tx_start)
+            block_sizes.append(e.end - e.start)
+        # make bed fields
+        fields = [self.chrom,
+                  str(tx_start),
+                  str(tx_end),
+                  self._id,
+                  str(self.expr),
+                  Strand.to_gtf(self.strand),
+                  '0',
+                  '0',
+                  '0',
+                  str(len(self.exons)),
+                  ','.join(map(str, block_sizes)),
+                  ','.join(map(str, block_starts))]
+        return fields
+
+    @staticmethod
+    def from_bed(line):
+        fields = line.strip().split('\t')
+        chrom = fields[0]
+        tx_start = int(fields[1])
+        _id = fields[3]
+        is_ref = (_id.split('.')[0] == Sample.REF_ID)
+        expr = float(fields[4])
+        strand = Strand.from_bed(fields[5])
+        num_exons = int(fields[9])
+        block_sizes = map(int, fields[10].split(','))
+        block_starts = map(int, fields[11].split(','))
+        exons = []
+        for i in xrange(num_exons):
+            start = tx_start + block_starts[i]
+            end = start + block_sizes[i]
+            exons.append(Exon(start, end))
+        return Transfrag(chrom=chrom,
+                         strand=strand,
+                         _id=_id,
+                         expr=expr,
+                         is_ref=is_ref,
+                         exons=exons)
 
     def to_gtf(self):
         strand_str = Strand.to_gtf(self.strand)

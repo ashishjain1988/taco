@@ -55,10 +55,8 @@ cython_extensions = [
 ]
 
 extensions = [
-    Extension('taco.lib.caggregate', sources=['taco/lib/caggregate.c']),
     Extension('taco.lib.clocusindex',
-              sources=['taco/lib/clocusindex.c',
-                       'taco/lib/cgtf.c'],
+              sources=['taco/lib/clocusindex.c'],
               include_dirs=['taco/lib'])
 ]
 

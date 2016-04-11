@@ -34,6 +34,8 @@ class Strand:
     NAMES = ['pos', 'neg', 'none']
     FROM_GTF = {'+': POS, '-': NEG, '.': NA}
     TO_GTF = {POS: '+', NEG: '-', NA: '.'}
+    FROM_BED = {'+': POS, '-': NEG, '.': NA}
+    TO_BED = {POS: '+', NEG: '-', NA: '.'}
 
     @staticmethod
     def to_str(s):
@@ -46,6 +48,14 @@ class Strand:
     @staticmethod
     def to_gtf(s):
         return Strand.TO_GTF[s]
+
+    @staticmethod
+    def from_bed(s):
+        return Strand.FROM_BED[s]
+
+    @staticmethod
+    def to_bed(s):
+        return Strand.TO_BED[s]
 
 
 
@@ -110,9 +120,9 @@ class Results(object):
     STATUS_FILE = 'status.json'
     ARGS_FILE = 'args.pickle'
     SAMPLE_FILE = 'samples.txt'
-    TRANSFRAGS_GTF_FILE = 'transfrags.gtf'
-    TRANSFRAGS_FILTERED_GTF_FILE = 'transfrags.filtered.gtf'
-    AGGREGATE_STATS_FILE = 'aggregate_stats.txt'
+    TRANSFRAGS_BED_FILE = 'transfrags.bed'
+    TRANSFRAGS_FILTERED_BED_FILE = 'transfrags.filtered.bed'
+    SAMPLE_STATS_FILE = 'sample_stats.txt'
     LOCUS_INDEX_FILE = 'loci.txt'
     SPLICE_GRAPH_GTF_FILE = 'splice_graph.gtf'
     BEDGRAPH_FILES = ['expr.pos.bedgraph', 'expr.neg.bedgraph',
@@ -128,14 +138,14 @@ class Results(object):
         self.args_file = os.path.join(output_dir, Results.ARGS_FILE)
         self.status_file = os.path.join(output_dir, Results.STATUS_FILE)
         self.sample_file = os.path.join(output_dir, Results.SAMPLE_FILE)
-        self.aggregate_stats_file = \
-            os.path.join(output_dir, Results.AGGREGATE_STATS_FILE)
+        self.sample_stats_file = \
+            os.path.join(output_dir, Results.SAMPLE_STATS_FILE)
         self.locus_index_file = \
             os.path.join(output_dir, Results.LOCUS_INDEX_FILE)
-        self.transfrags_gtf_file = \
-            os.path.join(output_dir, Results.TRANSFRAGS_GTF_FILE)
-        self.transfrags_filtered_gtf_file = \
-            os.path.join(output_dir, Results.TRANSFRAGS_FILTERED_GTF_FILE)
+        self.transfrags_bed_file = \
+            os.path.join(output_dir, Results.TRANSFRAGS_BED_FILE)
+        self.transfrags_filtered_bed_file = \
+            os.path.join(output_dir, Results.TRANSFRAGS_FILTERED_BED_FILE)
         self.splice_graph_gtf_file = \
             os.path.join(output_dir, Results.SPLICE_GRAPH_GTF_FILE)
         self.bedgraph_files = [os.path.join(output_dir, x)

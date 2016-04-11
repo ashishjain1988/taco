@@ -10,7 +10,8 @@ from collections import namedtuple
 
 from taco.lib.gtf import GTF
 from taco.lib.base import Strand, Results
-from taco.lib.batch_sort import batch_sort, batch_merge
+from taco.lib.batch_sort import batch_sort, batch_merge, sort_key_gtf, \
+    sort_key_bed, SORT_BUFFER_SIZE
 from taco.lib.transfrag import Transfrag
 from taco.lib.locus import Locus
 from taco.lib.cpathfinder import find_paths
@@ -20,17 +21,14 @@ __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
 __credits__ = ["Matthew Iyer", "Yashar Niknafs"]
 __license__ = "GPL"
-__version__ = "0.4.3"
+__version__ = "0.4.5"
 __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
 
 
-# batch sort configuration
-SORT_BUFFER_SIZE = 32000
-
-GTFLocus = namedtuple('GTFLocus', ['name', 'chrom', 'start', 'end', 'filepos',
-                                   'num_lines'])
+LocusIndex = namedtuple('LocusIndex', ['name', 'chrom', 'start', 'end',
+                        'filepos', 'num_lines'])
 
 
 class Isoform(object):
@@ -297,30 +295,10 @@ def assemble_gene(sgraph, locus_id_str, config):
             print >>config.assembly_bed_fh, '\t'.join(fields)
 
 
-def filter_transfrags(transfrags, min_length, min_expr, filtered_gtf_fh):
-    new_transfrags = []
-    for t in transfrags:
-        if ((t.length < min_length) or (t.expr < min_expr)):
-            for f in t.to_gtf():
-                print >>filtered_gtf_fh, str(f)
-        else:
-            new_transfrags.append(t)
-    return new_transfrags
-
-
-def assemble_locus(locus, transfrags, config):
-    # filter transfrags by expression and transfrag length
-    genome_id_str = '%s:%d-%d' % (locus.chrom, locus.start, locus.end)
-    locus_id = locus.name
-    num_transfrags = len(transfrags)
-    transfrags = filter_transfrags(transfrags,
-                                   config.min_transfrag_length,
-                                   config.min_expr,
-                                   config.transfrags_filtered_gtf_fh)
-    num_filtered_transfrags = len(transfrags)
-    logging.debug('%s locus: %s transfrags: %d filtered: %d' %
-                  (genome_id_str, locus.name, num_transfrags,
-                   num_filtered_transfrags))
+def assemble_locus(locus_index, transfrags, config):
+    genome_id_str = '%s:%d-%d' % (locus_index.chrom, locus_index.start, locus_index.end)
+    logging.debug('%s locus: %s transfrags: %d' %
+                  (genome_id_str, locus_index.name, len(transfrags)))
     if len(transfrags) == 0:
         return
     # create locus
@@ -330,7 +308,7 @@ def assemble_locus(locus, transfrags, config):
                          config.guided_assembly)
     genome_id_str = '%s:%d-%d' % (locus.chrom, locus.start, locus.end)
     logging.debug('%s locus: %s transfrags: %d (+: %d, -: %d, .: %d)' %
-                  (genome_id_str, locus_id, len(transfrags),
+                  (genome_id_str, locus_index.name, len(transfrags),
                    len(locus.get_transfrags(Strand.POS)),
                    len(locus.get_transfrags(Strand.NEG)),
                    len(locus.get_transfrags(Strand.NA))))
@@ -338,7 +316,7 @@ def assemble_locus(locus, transfrags, config):
     num_resolved = locus.impute_unknown_strands()
     if num_resolved > 0:
         logging.debug('%s locus: %s resolved: %d (+: %d, -: %d, .: %d)' %
-                      (genome_id_str, locus_id, num_resolved,
+                      (genome_id_str, locus_index.name, num_resolved,
                        len(locus.get_transfrags(Strand.POS)),
                        len(locus.get_transfrags(Strand.NEG)),
                        len(locus.get_transfrags(Strand.NA))))
@@ -348,19 +326,22 @@ def assemble_locus(locus, transfrags, config):
     locus.write_splice_bed(config.splice_bed_fh)
     # convert to stranded locus objects
     for sgraph in locus.create_splice_graphs():
-        assemble_gene(sgraph, locus_id, config)
+        if (sgraph.strand == Strand.NA) and not config.assemble_unstranded:
+            continue
+        assemble_gene(sgraph, locus_index.name, config)
 
 
-def parse_gtf_locus(locus, gtf_fileh):
+def parse_locus(locus, fh):
     genome_id_str = '%s:%d-%d' % (locus.chrom, locus.start, locus.end)
     logging.debug('%s locus: %s features: %d' %
                   (genome_id_str, locus.name, locus.num_lines))
     # fast-forward to 'filepos'
-    gtf_fileh.seek(locus.filepos)
-    # read 'num_lines' lines from file and parse into transfrag objects
-    t_dict = Transfrag.parse_gtf(next(gtf_fileh)
-                                 for x in xrange(locus.num_lines))
-    return t_dict.values()
+    fh.seek(locus.filepos)
+    # parse 'num_lines' from file into Transfrag objects
+    transfrags = []
+    for i in xrange(locus.num_lines):
+        transfrags.append(Transfrag.from_bed(fh.next()))
+    return transfrags
 
 
 def parse_locus_index(filename):
@@ -373,18 +354,7 @@ def parse_locus_index(filename):
             end = int(fields[3])
             filepos = int(fields[4])
             num_lines = int(fields[5])
-            yield GTFLocus(name, chrom, start, end, filepos, num_lines)
-
-
-def sort_key_bed(line):
-    fields = line.split('\t', 2)
-    return (fields[0], int(fields[1]))
-
-
-def sort_key_gtf(line):
-    fields = line.split('\t', 4)
-    feature_key = 0 if fields[2] == 'transcript' else 1
-    return (fields[0], int(fields[3]), feature_key)
+            yield LocusIndex(name, chrom, start, end, filepos, num_lines)
 
 
 class LockValue(object):
@@ -408,9 +378,9 @@ class GlobalIds(object):
 
 
 class WorkerState(object):
-    def __init__(self, gtf_file, input_queue, global_ids,
+    def __init__(self, bed_file, input_queue, global_ids,
                  runtime_args, output_dir):
-        self.gtf_file = gtf_file
+        self.bed_file = bed_file
         self.input_queue = input_queue
         for k, v in vars(global_ids).iteritems():
             setattr(self, k, v)
@@ -428,8 +398,6 @@ class WorkerState(object):
         self.path_graph_stats_fh = open(r.path_graph_stats_file, 'w')
         self.assembly_gtf_fh = open(r.assembly_gtf_file, 'w')
         self.assembly_bed_fh = open(r.assembly_bed_file, 'w')
-        self.transfrags_filtered_gtf_fh = \
-            open(r.transfrags_filtered_gtf_file, 'w')
 
     def close(self):
         # close files
@@ -440,7 +408,6 @@ class WorkerState(object):
         self.path_graph_stats_fh.close()
         self.assembly_gtf_fh.close()
         self.assembly_bed_fh.close()
-        self.transfrags_filtered_gtf_fh.close()
 
     def sort_output_files(self):
         # create output directories
@@ -457,15 +424,6 @@ class WorkerState(object):
         # create new set of sorted results
         sorted_results = Results(sort_output_dir)
 
-        # filtered gtf file
-        logging.debug('\t%s filtered gtf file' % (results.output_dir))
-        batch_sort(input=results.transfrags_filtered_gtf_file,
-                   output=sorted_results.transfrags_filtered_gtf_file,
-                   key=sort_key_gtf,
-                   buffer_size=SORT_BUFFER_SIZE,
-                   tempdirs=[sort_tmp_dir])
-        os.rename(sorted_results.transfrags_filtered_gtf_file,
-                  results.transfrags_filtered_gtf_file)
         # bedgraph files
         logging.debug('\t%s bedgraph files' % (results.output_dir))
         for filename, sorted_filename in zip(results.bedgraph_files,
@@ -528,12 +486,12 @@ class WorkerState(object):
 
 def assemble_worker(state):
     # process loci via input queue
-    gtf_fileh = open(state.gtf_file)
+    bed_fh = open(state.bed_file)
     while True:
         locus = state.input_queue.get()
         if locus is None:
             break
-        assemble_locus(locus, parse_gtf_locus(locus, gtf_fileh), state)
+        assemble_locus(locus, parse_locus(locus, bed_fh), state)
         state.input_queue.task_done()
     state.input_queue.task_done()
     # cleanup and close files
@@ -565,12 +523,13 @@ def assemble_parallel(args, results):
     - max_paths
     - isoform_frac
     - max_isoforms
+    - assemble_unstranded
 
     Results
     =======
     Input file attributes:
     - locus_index_file
-    - transfrags_gtf_file
+    - transfrags_bed_file
 
     Output file attributes:
     - bedgraph_files
@@ -584,7 +543,7 @@ def assemble_parallel(args, results):
                  (args.num_processes))
     # create queue
     input_queue = JoinableQueue(maxsize=args.num_processes * 2)
-    gtf_file = results.transfrags_gtf_file
+    bed_file = results.transfrags_bed_file
     global_ids = GlobalIds()
     # start worker processes
     procs = []
@@ -596,7 +555,7 @@ def assemble_parallel(args, results):
             logging.debug("\tcreating worker directory '%s'" % (worker_dir))
             os.makedirs(worker_dir)
         worker_results.append(Results(worker_dir))
-        worker_state = WorkerState(gtf_file, input_queue, global_ids,
+        worker_state = WorkerState(bed_file, input_queue, global_ids,
                                    args, worker_dir)
         p = Process(target=assemble_worker, args=(worker_state,))
         p.start()
@@ -625,10 +584,6 @@ def assemble_parallel(args, results):
             fh.close()
 
     logging.info('Merging output files')
-    logging.debug('\tmerging filtered gtf files')
-    merge(input_files=[r.transfrags_filtered_gtf_file for r in worker_results],
-          output_file=results.transfrags_filtered_gtf_file,
-          key=sort_key_gtf)
     logging.debug('\tmerging bedgraph files')
     for i, output_file in enumerate(results.bedgraph_files):
         input_files = [r.bedgraph_files[i] for r in worker_results]
