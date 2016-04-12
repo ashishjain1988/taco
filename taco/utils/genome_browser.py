@@ -102,6 +102,7 @@ def main():
                          outfile])
 
     prepare_igvtools(igvtools, r.splice_graph_gtf_file, ext='gtf')
+    prepare_igvtools(igvtools, r.change_point_gtf_file, ext='gtf')
     prepare_igvtools(igvtools, r.assembly_gtf_file, ext='gtf')
     prepare_igvtools(igvtools, r.splice_bed_file, ext='bed')
 

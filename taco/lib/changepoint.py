@@ -18,8 +18,7 @@ __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
 
-ChangePoint = namedtuple('ChangePoint', ['index', 'dist_left', 'dist_right',
-                                         'pos', 'start', 'end',
+ChangePoint = namedtuple('ChangePoint', ['pos', 'start', 'end',
                                          'pvalue', 'foldchange', 'sign'])
 
 
@@ -130,8 +129,7 @@ def bin_seg_slope(a, s_a, pval=0.05, fc_cutoff=0.80, size_cutoff=20,
     # TODO: when does this happen?
     if j != 0 and k != 0:
         # save changepoint
-        cps.append(ChangePoint(index=i+offset, dist_left=j, dist_right=k,
-                               pos=i+offset, start=i-j, end=i+k,
+        cps.append(ChangePoint(pos=offset+i, start=offset+i-j, end=offset+i+k,
                                pvalue=p, sign=sign, foldchange=fc))
         # test left segment
         if (offset+i-j) > offset:

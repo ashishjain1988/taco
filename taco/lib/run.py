@@ -49,6 +49,7 @@ class Args:
     PATH_FRAC = 0.0
     MAX_PATHS = 0
     RESUME = False
+    ASSEMBLE = None
     OUTPUT_DIR = 'taco'
     PROG = 'taco'
     DESCRIPTION = 'TACO: Meta-assembly of RNA-Seq datasets'
@@ -130,10 +131,6 @@ class Args:
                             help='directory where output files will be '
                             'stored (if already exists then --resume must '
                             'be specified) [default=%(default)s]')
-        parser.add_argument('--resume', dest='resume',
-                            action='store_true',
-                            default=Args.RESUME,
-                            help='resume a previous run in <dir>')
         parser.add_argument('--assemble-unstranded',
                             dest='assemble_unstranded',
                             action='store_true',
@@ -152,6 +149,17 @@ class Args:
         parser.add_argument('--no-change-point', dest='change_point',
                             action='store_false',
                             help='Disable change point detection')
+        parser.add_argument('--resume', dest='resume',
+                            action='store_true',
+                            default=Args.RESUME,
+                            help='resume a previous run in <dir>')
+        advgrp.add_argument('--assemble',
+                            dest='assemble',
+                            metavar='BED',
+                            default=Args.ASSEMBLE,
+                            help='Assemble transfrags produced by a previous '
+                            'TACO run, bypassing the GTF aggregation and '
+                            'step. Accepts a taco-formatted BED file')
         advgrp.add_argument('--change-point-pvalue', type=float,
                             dest='change_point_pvalue',
                             default=Args.CHANGE_POINT_PVALUE,
@@ -241,11 +249,46 @@ class Args:
         func(fmt.format('max paths:', args.max_paths))
 
     @staticmethod
+    def validate(args):
+        if args.min_transfrag_length < 0:
+            parser.error("min_transfrag_length < 0")
+        if args.min_expr < 0:
+            parser.error("min_expr < 0")
+        if (args.isoform_frac < 0) or (args.isoform_frac > 1):
+            parser.error("isoform_frac out of range (0.0-1.0)")
+        if (args.max_isoforms < 0):
+            parser.error("max_isoforms < 0")
+
+        if not (0 <= args.path_graph_loss_threshold <= 1):
+            parser.error("loss_threshold not in range (0.0-1.0)")
+        if args.path_graph_kmax < 0:
+            parser.error("kmax must be >= 0")
+        if args.max_paths < 0:
+            parser.error("max_paths must be >= 0")
+        if not (0 <= args.path_frac <= 1):
+            parser.error("path_frac not in range (0.0-1.0)")
+
+        if args.change_point:
+            if not (0.0 <= args.change_point_pvalue <= 1.0):
+                parser.error('change point pvalue invalid')
+            if not (0.0 <= args.change_point_fold_change <= 1.0):
+                parser.error('change point fold change invalid')
+        if args.ref_gtf_file is not None:
+            if not os.path.exists(args.ref_gtf_file):
+                parser.error("reference GTF file %s not found" %
+                             (args.ref_gtf_file))
+            args.ref_gtf_file = os.path.abspath(args.ref_gtf_file)
+        elif (args.guided_assembly or args.guided_ends or
+              args.guided_strand):
+            parser.error('Guided assembly modes require a '
+                         'reference GTF (--ref-gtf)')
+
+    @staticmethod
     def parse():
         parser = Args.create()
         args = parser.parse_args()
-        # check if we are trying to resume a previous run
         if args.resume:
+            # check if we are trying to resume a previous run
             if not os.path.exists(args.output_dir):
                 parser.error("Output directory '%s' does not exist" %
                              args.output_dir)
@@ -261,45 +304,19 @@ class Args:
             if os.path.exists(args.output_dir):
                 parser.error("Output directory '%s' already exists" %
                              args.output_dir)
+            # check if we are trying bypass aggregate and assemble from a
+            # preexisting BED file
+            if args.assemble is not None:
+                if not os.path.exists(args.assemble):
+                    parser.error('(--assemble) BED file %s not found')
+                args.assemble = os.path.abspath(args.assemble)
 
             if args.sample_file is None:
-                parser.error("sample file not specified")
+                parser.error('Sample file not specified')
             if not os.path.exists(args.sample_file):
-                parser.error("sample file %s not found" % (args.sample_file))
+                parser.error('Sample file %s not found' % (args.sample_file))
             args.sample_file = os.path.abspath(args.sample_file)
-
-            if args.min_transfrag_length < 0:
-                parser.error("min_transfrag_length < 0")
-            if args.min_expr < 0:
-                parser.error("min_expr < 0")
-            if (args.isoform_frac < 0) or (args.isoform_frac > 1):
-                parser.error("isoform_frac out of range (0.0-1.0)")
-            if (args.max_isoforms < 0):
-                parser.error("max_isoforms < 0")
-
-            if not (0 <= args.path_graph_loss_threshold <= 1):
-                parser.error("loss_threshold not in range (0.0-1.0)")
-            if args.path_graph_kmax < 0:
-                parser.error("kmax must be >= 0")
-            if args.max_paths < 0:
-                parser.error("max_paths must be >= 0")
-            if not (0 <= args.path_frac <= 1):
-                parser.error("path_frac not in range (0.0-1.0)")
-
-            if (args.change_point):
-                if not (0.0 <= args.change_point_pvalue <= 1.0):
-                    parser.error('change point pvalue invalid')
-                if not (0.0 <= args.change_point_fold_change <= 1.0):
-                    parser.error('change point fold change invalid')
-            if args.ref_gtf_file is not None:
-                if not os.path.exists(args.ref_gtf_file):
-                    parser.error("reference GTF file %s not found" %
-                                 (args.ref_gtf_file))
-                args.ref_gtf_file = os.path.abspath(args.ref_gtf_file)
-            elif (args.guided_assembly or args.guided_ends or
-                  args.guided_strand):
-                parser.error('Guided assembly modes require a '
-                             'reference GTF (--ref-gtf)')
+            Args.validate(args)
         return args
 
 
@@ -330,6 +347,15 @@ class Run(object):
         self = Run()
         # parse command line args
         args = Args.parse()
+        # setup logging
+        if args.verbose:
+            level = logging.DEBUG
+        else:
+            level = logging.INFO
+        logging.basicConfig(level=level,
+                            format="%(asctime)s pid=%(process)d "
+                                   "%(levelname)s - %(message)s")
+
         if args.resume:
             self.results = Results(args.output_dir)
             self.status = Status.load(self.results.status_file)
@@ -342,14 +368,6 @@ class Run(object):
             self.status = Status()
             self.samples = Sample.parse_tsv(self.args.sample_file)
 
-        # setup logging
-        if args.verbose:
-            level = logging.DEBUG
-        else:
-            level = logging.INFO
-        logging.basicConfig(level=level,
-                            format="%(asctime)s pid=%(process)d "
-                                   "%(levelname)s - %(message)s")
         # create output directories
         results = self.results
         if not os.path.exists(results.output_dir):
@@ -365,6 +383,11 @@ class Run(object):
             Args.dump(self.args, self.results.args_file)
             # write samples
             Sample.write_tsv(self.samples, self.results.sample_file)
+            # bypass aggregate step
+            if args.assemble is not None:
+                # create a symbolic link to BED file
+                os.symlink(args.assemble, self.results.transfrags_bed_file)
+                self.status.aggregate = True
             # update status and write to file
             self.status.create = True
             self.status.write(self.results.status_file)

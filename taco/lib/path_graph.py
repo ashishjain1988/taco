@@ -67,6 +67,10 @@ class PathGraphFactory(object):
             self.has_source.append(path[0] in start_nodes)
             self.has_sink.append(path[-1] in stop_nodes)
 
+    def __str__(self):
+        return ('PathGraphFactory %s:%d-%d[%s]' %
+                (self.chrom, self.start, self.end, Strand.to_gtf(self.strand)))
+
     def longest_path_length(self):
         longest_path = 0
         for i in xrange(len(self.paths)):
@@ -128,8 +132,6 @@ class PathGraphFactory(object):
         if user_kmax > 0:
             # user can force a specific kmax (for debugging/testing purposes)
             kmax = min(user_kmax, kmax)
-        id_str = ('%s:%d-%d[%s]' % (self.chrom, self.start, self.end,
-                                    Strand.to_gtf(self.strand)))
 
         def compute_kmers(k):
             K = self.create(k)
@@ -151,13 +153,13 @@ class PathGraphFactory(object):
 
         k, num_kmers = maximize_bisect(compute_kmers, 1, kmax, 0)
         logging.debug('%s creating path graph k=%d num_kmers=%d' %
-                      (id_str, k, num_kmers))
+                      (str(self), k, num_kmers))
         K = self.create(k)
         logging.debug('%s rescuing short transfrags kmers=%d' %
-                      (id_str, len(K)))
+                      (str(self), len(K)))
         num_lost = self.rescue_short_transfrags(K, K.short_transfrags)
         logging.debug('%s lost %d of %d short transfrags' %
-                      (id_str, num_lost, len(K.short_transfrags)))
+                      (str(self), num_lost, len(K.short_transfrags)))
         return K, k
 
     def rescue_short_transfrags(self, K, indexes):

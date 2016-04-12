@@ -53,8 +53,8 @@ def main():
                  (locus.name, locus.num_lines, locus.chrom,
                   locus.start, locus.end))
 
-    # extract gtf for locus
-    with open(r.transfrags_gtf_file) as fh:
+    # extract locus
+    with open(r.transfrags_bed_file) as fh:
         fh.seek(locus.filepos)
         for i in xrange(locus.num_lines):
             print fh.next(),

@@ -114,6 +114,11 @@ class SpliceGraph(object):
         self.node_bounds = None
         self.G = None
 
+    def __str__(self):
+        return ('SpliceGraph %s:%d-%d[%s] transfrags: %d' %
+                (self.chrom, self.start, self.end,
+                 Strand.to_gtf(self.strand), len(self.transfrags)))
+
     @staticmethod
     def create(transfrags,
                guided_ends=False,
@@ -290,8 +295,6 @@ class SpliceGraph(object):
 
         returns list of ChangePoint tuples
         '''
-        genome_id_str = ('%s:%d-%d[%s]' % (self.chrom, self.start, self.end,
-                         Strand.to_gtf(self.strand)))
         changepts = []
         for n in self.G.nodes_iter():
             expr_data = self.get_expr_data(*n)
@@ -303,7 +306,7 @@ class SpliceGraph(object):
                 changepts.append(cp)
                 logging.debug('%s changepoint node=(%s-%s) '
                               'pos=%d interval=(%d-%d) p=%.3f fc=%.3f' %
-                              (genome_id_str, n.start,
+                              (str(self), n.start,
                                n.end, cp.pos, cp.start, cp.end,
                                cp.pvalue, cp.foldchange))
         return changepts

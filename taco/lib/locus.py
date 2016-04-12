@@ -77,6 +77,13 @@ class Locus(object):
         self.strand_data = None
         self.strand_transfrags = [[], [], []]
 
+    def __str__(self):
+        return ('Locus %s:%d-%d transfrags: (+: %d, -: %d, .: %d)' %
+                (self.chrom, self.start, self.end,
+                 len(self.strand_transfrags[Strand.POS]),
+                 len(self.strand_transfrags[Strand.NEG]),
+                 len(self.strand_transfrags[Strand.NA])))
+
     @staticmethod
     def create(transfrags,
                guided_strand=False,

@@ -22,6 +22,7 @@ __status__ = "Development"
 class TacoError(Exception):
     pass
 
+
 Exon = collections.namedtuple('Exon', ['start', 'end'])
 
 
@@ -125,6 +126,7 @@ class Results(object):
     SAMPLE_STATS_FILE = 'sample_stats.txt'
     LOCUS_INDEX_FILE = 'loci.txt'
     SPLICE_GRAPH_GTF_FILE = 'splice_graph.gtf'
+    CHANGE_POINT_GTF_FILE = 'change_points.gtf'
     BEDGRAPH_FILES = ['expr.pos.bedgraph', 'expr.neg.bedgraph',
                       'expr.none.bedgraph']
     SPLICE_BED_FILE = 'splice_junctions.bed'
@@ -140,14 +142,16 @@ class Results(object):
         self.sample_file = os.path.join(output_dir, Results.SAMPLE_FILE)
         self.sample_stats_file = \
             os.path.join(output_dir, Results.SAMPLE_STATS_FILE)
-        self.locus_index_file = \
-            os.path.join(output_dir, Results.LOCUS_INDEX_FILE)
         self.transfrags_bed_file = \
             os.path.join(output_dir, Results.TRANSFRAGS_BED_FILE)
         self.transfrags_filtered_bed_file = \
             os.path.join(output_dir, Results.TRANSFRAGS_FILTERED_BED_FILE)
+        self.locus_index_file = \
+            os.path.join(output_dir, Results.LOCUS_INDEX_FILE)
         self.splice_graph_gtf_file = \
             os.path.join(output_dir, Results.SPLICE_GRAPH_GTF_FILE)
+        self.change_point_gtf_file = \
+            os.path.join(output_dir, Results.CHANGE_POINT_GTF_FILE)
         self.bedgraph_files = [os.path.join(output_dir, x)
                                for x in Results.BEDGRAPH_FILES]
         self.splice_bed_file = \

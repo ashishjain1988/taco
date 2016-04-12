@@ -205,24 +205,21 @@ def assemble_isoforms(sgraph, config):
         return []
     # smooth kmer graph
     K.apply_smoothing()
-
-    genome_id_str = ('%s:%d-%d[%s]' %
-                     (sgraph.chrom, sgraph.start, sgraph.end,
-                      Strand.to_gtf(sgraph.strand)))
+    # find isoforms
     logging.debug('%s finding isoforms in k=%d graph (%d kmers) '
                   'source_expr=%f' %
-                  (genome_id_str, k, len(K), K.exprs[K.SOURCE_ID]))
+                  (sgraph, k, len(K), K.exprs[K.SOURCE_ID]))
     paths = []
     for path_kmers, expr in find_paths(K, config.path_frac, config.max_paths):
         # convert path of kmers back to path of nodes in splice graph
         path = K.reconstruct(path_kmers)
         paths.append((path, expr))
-    logging.debug('%s isoforms: %d' % (genome_id_str, len(paths)))
+    logging.debug('%s isoforms: %d' % (sgraph, len(paths)))
 
     # build gene clusters
     clusters, filtered = Cluster.build(paths, min_frac=config.isoform_frac)
     logging.debug('%s gene clusters: %d filtered transfrags: %d' %
-                  (genome_id_str, len(clusters), len(filtered)))
+                  (sgraph, len(clusters), len(filtered)))
     gene_isoforms = []
     for cluster in clusters:
         isoforms = []
@@ -241,22 +238,15 @@ def assemble_isoforms(sgraph, config):
 
 
 def assemble_gene(sgraph, locus_id_str, config):
-    genome_id_str = ('%s:%d-%d[%s]' %
-                     (sgraph.chrom, sgraph.start, sgraph.end,
-                      Strand.to_gtf(sgraph.strand)))
     logging.debug('%s locus: %s nodes: %d' %
-                  (genome_id_str, locus_id_str, len(sgraph.G)))
-    # output splice graph node data
-    for f in sgraph.get_node_gtf():
-        print >>config.splice_graph_gtf_fh, str(f)
-
+                  (sgraph, locus_id_str, len(sgraph.G)))
     if config.change_point:
         # detect change points
         changepts = sgraph.detect_change_points(
             pval=config.change_point_pvalue,
             fc_cutoff=config.change_point_fold_change)
         logging.debug('%s locus %s change points: %d' %
-                      (genome_id_str, locus_id_str, len(changepts)))
+                      (sgraph, locus_id_str, len(changepts)))
         for cp in changepts:
             sgraph.apply_change_point(cp, config.change_point_trim)
             # output splice graph change points
@@ -265,6 +255,10 @@ def assemble_gene(sgraph, locus_id_str, config):
         # must recreate splice graph after finding change points
         if len(changepts) > 0:
             sgraph.recreate()
+
+    # output splice graph node data
+    for f in sgraph.get_node_gtf():
+        print >>config.splice_graph_gtf_fh, str(f)
 
     # run isoform path finding algorithm, filter and group into genes
     for gene_isoforms in assemble_isoforms(sgraph, config):
@@ -300,9 +294,6 @@ def assemble_gene(sgraph, locus_id_str, config):
 
 
 def assemble_locus(locus_index, transfrags, config):
-    genome_id_str = '%s:%d-%d' % (locus_index.chrom, locus_index.start, locus_index.end)
-    logging.debug('%s locus: %s transfrags: %d' %
-                  (genome_id_str, locus_index.name, len(transfrags)))
     if len(transfrags) == 0:
         return
     # create locus
@@ -310,20 +301,12 @@ def assemble_locus(locus_index, transfrags, config):
                          config.guided_strand,
                          config.guided_ends,
                          config.guided_assembly)
-    genome_id_str = '%s:%d-%d' % (locus.chrom, locus.start, locus.end)
-    logging.debug('%s locus: %s transfrags: %d (+: %d, -: %d, .: %d)' %
-                  (genome_id_str, locus_index.name, len(transfrags),
-                   len(locus.get_transfrags(Strand.POS)),
-                   len(locus.get_transfrags(Strand.NEG)),
-                   len(locus.get_transfrags(Strand.NA))))
+    logging.debug('%s locus: %s' % (locus, locus_index.name))
     # resolve unstranded transcripts
     num_resolved = locus.impute_unknown_strands()
     if num_resolved > 0:
-        logging.debug('%s locus: %s resolved: %d (+: %d, -: %d, .: %d)' %
-                      (genome_id_str, locus_index.name, num_resolved,
-                       len(locus.get_transfrags(Strand.POS)),
-                       len(locus.get_transfrags(Strand.NEG)),
-                       len(locus.get_transfrags(Strand.NA))))
+        logging.debug('%s locus: %s resolved: %d' %
+                      (locus, locus_index.name, num_resolved))
     # write bedgraph files after strand resolved
     locus.write_bedgraph(config.bedgraph_fhs)
     # write splice junctions
@@ -337,8 +320,8 @@ def assemble_locus(locus_index, transfrags, config):
 
 def parse_locus(locus, fh):
     genome_id_str = '%s:%d-%d' % (locus.chrom, locus.start, locus.end)
-    logging.debug('%s locus: %s features: %d' %
-                  (genome_id_str, locus.name, locus.num_lines))
+    logging.debug('LocusIndex: %s coords: %s transfrags: %d' %
+                  (locus.name, genome_id_str, locus.num_lines))
     # fast-forward to 'filepos'
     fh.seek(locus.filepos)
     # parse 'num_lines' from file into Transfrag objects
@@ -399,6 +382,7 @@ class WorkerState(object):
             self.bedgraph_fhs.append(open(filename, 'w'))
         self.splice_bed_fh = open(r.splice_bed_file, 'w')
         self.splice_graph_gtf_fh = open(r.splice_graph_gtf_file, 'w')
+        self.change_point_gtf_fh = open(r.change_point_gtf_file, 'w')
         self.path_graph_stats_fh = open(r.path_graph_stats_file, 'w')
         self.assembly_gtf_fh = open(r.assembly_gtf_file, 'w')
         self.assembly_bed_fh = open(r.assembly_bed_file, 'w')
@@ -409,6 +393,7 @@ class WorkerState(object):
             fh.close()
         self.splice_bed_fh.close()
         self.splice_graph_gtf_fh.close()
+        self.change_point_gtf_fh.close()
         self.path_graph_stats_fh.close()
         self.assembly_gtf_fh.close()
         self.assembly_bed_fh.close()
@@ -455,6 +440,15 @@ class WorkerState(object):
                    tempdirs=[sort_tmp_dir])
         os.rename(sorted_results.splice_graph_gtf_file,
                   results.splice_graph_gtf_file)
+        # change point gtf
+        logging.debug('\t%s change point gtf file' % (results.output_dir))
+        batch_sort(input=results.change_point_gtf_file,
+                   output=sorted_results.change_point_gtf_file,
+                   key=sort_key_gtf,
+                   buffer_size=SORT_BUFFER_SIZE,
+                   tempdirs=[sort_tmp_dir])
+        os.rename(sorted_results.change_point_gtf_file,
+                  results.change_point_gtf_file)
         # path graph stats
         logging.debug('\t%s path graph stats file' % (results.output_dir))
         batch_sort(input=results.path_graph_stats_file,
@@ -602,6 +596,10 @@ def assemble_parallel(args, results):
     logging.debug('\tmerging splice graph gtf file')
     merge(input_files=[r.splice_graph_gtf_file for r in worker_results],
           output_file=results.splice_graph_gtf_file,
+          key=sort_key_gtf)
+    logging.debug('\tmerging change point gtf file')
+    merge(input_files=[r.change_point_gtf_file for r in worker_results],
+          output_file=results.change_point_gtf_file,
           key=sort_key_gtf)
     logging.debug('\tmerging path graph stats file')
     header = ['chrom', 'start', 'end', 'strand', 'k', 'kmax', 'transfrags',
