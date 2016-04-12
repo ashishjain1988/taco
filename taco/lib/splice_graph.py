@@ -403,6 +403,28 @@ class SpliceGraph(object):
                 stop_nodes.add(i)
         return start_nodes, stop_nodes
 
+    def reconstruct_exons(self, path):
+        # reverse negative stranded data so that all paths go from
+        # small -> large genomic coords
+        if self.strand == Strand.NEG:
+            path.reverse()
+        # convert from integer node labels to genome (start, end) tuples
+        path = [self.get_node_interval(nid) for nid in path]
+        # collapse contiguous nodes along path
+        newpath = []
+        chain = [path[0]]
+        for v in path[1:]:
+            if chain[-1].end != v.start:
+                # update path with merge chain node
+                newpath.append(Exon(chain[0].start,
+                                    chain[-1].end))
+                # reset chain
+                chain = []
+            chain.append(v)
+        # add last chain
+        newpath.append(Exon(chain[0].start, chain[-1].end))
+        return newpath
+
     def get_expr_data(self, start=None, end=None):
         if start is None:
             start = self.start

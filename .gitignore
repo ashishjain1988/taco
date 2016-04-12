@@ -3,6 +3,19 @@
 
 *.so
 
-*.so
 
-*.so
+taco/lib/cpathfinder.c
+
+taco/lib/csuffixarray.c
+
+taco/lib/cbedgraph.c
+
+taco/lib/cbisect.c
+
+taco/lib/cchangepoint.c
+
+taco/lib/bx/intersection.c
+
+taco/lib/bx/cluster.c
+
+taco/lib/scipy/norm_sf.c

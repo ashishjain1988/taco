@@ -239,28 +239,8 @@ class PathGraph(Graph):
         sai = SuffixArrayIndex(nodes)
         return sai
 
-
-def reconstruct_path(kmer_path, pgraph, sgraph):
-    # reconstruct nodes from kmers
-    path = list(pgraph.nodes[kmer_path[1]])
-    path.extend(pgraph.nodes[n][-1] for n in kmer_path[2:-1])
-    # reverse negative stranded data so that all paths go from
-    # small -> large genomic coords
-    if sgraph.strand == Strand.NEG:
-        path.reverse()
-    # convert from integer node labels to genome (start, end) tuples
-    path = [sgraph.get_node_interval(nid) for nid in path]
-    # collapse contiguous nodes along path
-    newpath = []
-    chain = [path[0]]
-    for v in path[1:]:
-        if chain[-1].end != v.start:
-            # update path with merge chain node
-            newpath.append(Exon(chain[0].start,
-                                chain[-1].end))
-            # reset chain
-            chain = []
-        chain.append(v)
-    # add last chain
-    newpath.append(Exon(chain[0].start, chain[-1].end))
-    return newpath
+    def reconstruct(self, path_kmers):
+        # reconstruct path from kmers
+        path = list(self.nodes[path_kmers[1]])
+        path.extend(self.nodes[n][-1] for n in path_kmers[2:-1])
+        return path

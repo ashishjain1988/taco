@@ -93,7 +93,7 @@ cdef find_path(int* nodes, int nnodes,
         j = path[i]
         new_expr = exprs[j] - expr
         exprs[j] = MIN_SCORE if MIN_SCORE >= new_expr else new_expr
-    return tuple(path), expr
+    return path, expr
 
 
 def find_paths(object G, float path_frac=0, int max_paths=0):
@@ -103,7 +103,7 @@ def find_paths(object G, float path_frac=0, int max_paths=0):
     cdef int nnodes, n
     cdef int source, sink, iterations
     cdef float expr, lowest_expr
-    cdef tuple path
+    cdef list path
     cdef list results
 
     # don't run if all nodes are zero

@@ -15,7 +15,7 @@ from taco.lib.batch_sort import batch_sort, batch_merge, sort_key_gtf, \
 from taco.lib.transfrag import Transfrag
 from taco.lib.locus import Locus
 from taco.lib.cpathfinder import find_paths
-from taco.lib.path_graph import PathGraphFactory, reconstruct_path
+from taco.lib.path_graph import PathGraphFactory
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
@@ -32,11 +32,11 @@ LocusIndex = namedtuple('LocusIndex', ['name', 'chrom', 'start', 'end',
 
 
 class Isoform(object):
-    __slots__ = ('expr', 'path', 'rel_frac', 'abs_frac',
+    __slots__ = ('expr', 'exons', 'rel_frac', 'abs_frac',
                  'gene_id', 'tss_id')
 
-    def __init__(self, path=None, expr=0.0, rel_frac=1.0, abs_frac=1.0):
-        self.path = path
+    def __init__(self, exons=None, expr=0.0, rel_frac=1.0, abs_frac=1.0):
+        self.exons = exons
         self.expr = expr
         self.rel_frac = rel_frac
         self.abs_frac = abs_frac
@@ -45,7 +45,6 @@ class Isoform(object):
 
 
 class Cluster(object):
-
     def __init__(self):
         self._id = 0
         self.expr = 1e-10
@@ -183,8 +182,8 @@ def assign_ids(isoforms, strand, gene_id_iter, tss_id_iter):
     tss_pos_id_map = {}
     gene_id = gene_id_iter.next()
     for isoform in isoforms:
-        start = isoform.path[0].start
-        end = isoform.path[-1].end
+        start = isoform.exons[0].start
+        end = isoform.exons[-1].end
         # map TSS positions to IDs
         tss_pos = end if strand == Strand.NEG else start
         if tss_pos not in tss_pos_id_map:
@@ -214,8 +213,9 @@ def assemble_isoforms(sgraph, config):
                   'source_expr=%f' %
                   (genome_id_str, k, len(K), K.exprs[K.SOURCE_ID]))
     paths = []
-    for kmer_path, expr in find_paths(K, config.path_frac, config.max_paths):
-        path = reconstruct_path(kmer_path, K, sgraph)
+    for path_kmers, expr in find_paths(K, config.path_frac, config.max_paths):
+        # convert path of kmers back to path of nodes in splice graph
+        path = K.reconstruct(path_kmers)
         paths.append((path, expr))
     logging.debug('%s isoforms: %d' % (genome_id_str, len(paths)))
 
@@ -227,7 +227,11 @@ def assemble_isoforms(sgraph, config):
     for cluster in clusters:
         isoforms = []
         for path, expr, rel_frac, abs_frac in cluster.iterpaths():
-            isoforms.append(Isoform(path=path, expr=expr, rel_frac=rel_frac,
+            # convert from splice graph node ids to exons
+            exons = sgraph.reconstruct_exons(path)
+            isoforms.append(Isoform(exons=exons,
+                                    expr=expr,
+                                    rel_frac=rel_frac,
                                     abs_frac=abs_frac))
         # apply max isoforms limit (per cluster)
         if config.max_isoforms > 0:
@@ -278,7 +282,7 @@ def assemble_gene(sgraph, locus_id_str, config):
             # write to GTF
             for f in get_gtf_features(chrom=sgraph.chrom,
                                       strand=sgraph.strand,
-                                      exons=isoform.path,
+                                      exons=isoform.exons,
                                       locus_id=locus_id_str,
                                       gene_id=gene_id_str,
                                       tss_id=tss_id_str,
@@ -291,7 +295,7 @@ def assemble_gene(sgraph, locus_id_str, config):
             name = "%s|%s(%.1f)" % (gene_id_str, t_id_str, isoform.expr)
             fields = write_bed(sgraph.chrom, name, sgraph.strand,
                                int(round(1000.0 * isoform.rel_frac)),
-                               isoform.path)
+                               isoform.exons)
             print >>config.assembly_bed_fh, '\t'.join(fields)
 
 
