@@ -251,7 +251,7 @@ def assemble_gene(sgraph, locus_id_str, config):
             sgraph.apply_change_point(cp, config.change_point_trim)
             # output splice graph change points
             for f in sgraph.get_change_point_gtf(cp):
-                print >>config.splice_graph_gtf_fh, str(f)
+                print >>config.change_point_gtf_fh, str(f)
         # must recreate splice graph after finding change points
         if len(changepts) > 0:
             sgraph.recreate()
