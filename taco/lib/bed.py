@@ -54,7 +54,7 @@ def sort_bed(input_file, output_file, num_processes=1, tmp_dir=None):
 
 def merge_bed(input_files, output_file, num_processes=1, tmp_dir=None):
     if num_processes > 1:
-        args = check_parallel_sort()
+        args = check_parallel_sort(num_processes)
     else:
         args = ['sort']
     if tmp_dir is not None:
