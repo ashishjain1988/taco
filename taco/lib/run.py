@@ -415,7 +415,7 @@ class Run(object):
         self.status.write(self.results.status_file)
 
     def assemble(self):
-        assemble_parallel(self.args, self.results)
+        assemble_parallel(self.args, self.results, len(self.samples))
         # update status and write to file
         self.status.assemble = True
         self.status.write(self.results.status_file)

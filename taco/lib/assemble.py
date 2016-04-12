@@ -273,6 +273,8 @@ def assemble_gene(sgraph, locus_id_str, config):
             t_id_str = "TU%d" % t_id
             tss_id_str = "TSS%d" % (isoform.tss_id)
             gene_id_str = "G%d" % (isoform.gene_id)
+            # normalize expression by number of samples
+            expr_norm = isoform.expr / config.num_samples
             # write to GTF
             for f in get_gtf_features(chrom=sgraph.chrom,
                                       strand=sgraph.strand,
@@ -281,12 +283,12 @@ def assemble_gene(sgraph, locus_id_str, config):
                                       gene_id=gene_id_str,
                                       tss_id=tss_id_str,
                                       transcript_id=t_id_str,
-                                      expr=isoform.expr,
+                                      expr=expr_norm,
                                       rel_frac=isoform.rel_frac,
                                       abs_frac=isoform.abs_frac):
                 print >>config.assembly_gtf_fh, str(f)
             # write to BED
-            name = "%s|%s(%.1f)" % (gene_id_str, t_id_str, isoform.expr)
+            name = "%s|%s(%.1f)" % (gene_id_str, t_id_str, expr_norm)
             fields = write_bed(sgraph.chrom, name, sgraph.strand,
                                int(round(1000.0 * isoform.rel_frac)),
                                isoform.exons)
@@ -366,9 +368,10 @@ class GlobalIds(object):
 
 class WorkerState(object):
     def __init__(self, bed_file, input_queue, global_ids,
-                 runtime_args, output_dir):
+                 runtime_args, num_samples, output_dir):
         self.bed_file = bed_file
         self.input_queue = input_queue
+        self.num_samples = num_samples
         for k, v in vars(global_ids).iteritems():
             setattr(self, k, v)
         for k, v in vars(runtime_args).iteritems():
@@ -500,11 +503,11 @@ def assemble_worker(state):
     state.sort_output_files()
 
 
-def assemble_parallel(args, results):
+def assemble_parallel(args, results, num_samples):
     '''
-    args: from Argparse module. command-line arguments to configure the
-          assembly process
+    args: object containing parameters to configure the assembly process
     results: Results object containing input and output filenames
+    num_samples: number of samples in assembly
 
     Args
     ====
@@ -533,6 +536,7 @@ def assemble_parallel(args, results):
     - bedgraph_files
     - splice_bed_file
     - splice_graph_gtf_file
+    - change_point_gtf_file
     - path_graph_stats_file
     - assembly_gtf_file
     - assembly_bed_file
@@ -554,7 +558,7 @@ def assemble_parallel(args, results):
             os.makedirs(worker_dir)
         worker_results.append(Results(worker_dir))
         worker_state = WorkerState(bed_file, input_queue, global_ids,
-                                   args, worker_dir)
+                                   args, num_samples, worker_dir)
         p = Process(target=assemble_worker, args=(worker_state,))
         p.start()
         procs.append(p)
