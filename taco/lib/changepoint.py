@@ -23,37 +23,18 @@ ChangePoint = namedtuple('ChangePoint', ['pos', 'start', 'end',
 
 
 def mse(x):
-    change_points = (np.ediff1d(x) != 0).nonzero()[0] + 1
-    if len(change_points) == 0:
-        return 0.0, -1
     mse_min = None
     mse_i = -1
-    for i in change_points:
+    for i in xrange(1, len(x)):
         x1 = x[:i]
         x2 = x[i:]
         mse1 = np.power(x1 - x1.mean(), 2).sum()
         mse2 = np.power(x2 - x2.mean(), 2).sum()
         mse = mse1 + mse2
-
         if (mse_i == -1) or (mse < mse_min):
             mse_min = mse
             mse_i = i
     return mse_min, mse_i
-
-
-def mwu_ediff(a, i):
-    a1 = a[:i]
-    a2 = a[i:]
-    a1 = a1[np.ediff1d(a1).nonzero()[0]]
-    a2 = a2[np.ediff1d(a2).nonzero()[0]]
-    if len(a1) == 0 or len(a2) == 0:
-        return (None, 1)
-    elif (len(np.unique(a1)) == 1 and
-          np.array_equal(np.unique(a1), np.unique(a2))):
-        return (None, 1)
-    else:
-        U, p = mannwhitneyu(a1, a2)
-        return (U, p)
 
 
 def mwu(a1, a2):
@@ -124,21 +105,22 @@ def bin_seg_slope(a, s_a, pval=0.05, fc_cutoff=0.80, size_cutoff=20,
         return cps
     # significant change point found - compute interval of slope change
     j, k, sign = slope_extract(s_a, offset + i)
-    # TODO: when does this happen?
-    if j != 0 and k != 0:
-        # save changepoint
-        cps.append(ChangePoint(pos=offset+i, start=offset+i-j, end=offset+i+k,
-                               pvalue=p, sign=sign, foldchange=fc))
-        # test left segment
-        if (offset+i-j) > offset:
-            b1 = a[:i-j]
-            cps = bin_seg_slope(b1, s_a, pval, fc_cutoff, size_cutoff,
-                                cp_func, cps=cps, offset=offset)
-        # test right segment
-        if (offset+i+k) < offset+len(a):
-            b2 = a[i+k:]
-            cps = bin_seg_slope(b2, s_a, pval, fc_cutoff, size_cutoff,
-                                cp_func, cps=cps, offset=(offset + i + k))
+    # ensure slope interval length is nonzero
+    if j == 0 or k == 0:
+        return cps
+    # save changepoint
+    cps.append(ChangePoint(pos=offset+i, start=offset+i-j, end=offset+i+k,
+                           pvalue=p, sign=sign, foldchange=fc))
+    # test left segment
+    if (offset+i-j) > offset:
+        b1 = a[:i-j]
+        cps = bin_seg_slope(b1, s_a, pval, fc_cutoff, size_cutoff,
+                            cp_func, cps=cps, offset=offset)
+    # test right segment
+    if (offset+i+k) < offset+len(a):
+        b2 = a[i+k:]
+        cps = bin_seg_slope(b2, s_a, pval, fc_cutoff, size_cutoff,
+                            cp_func, cps=cps, offset=(offset + i + k))
     return cps
 
 

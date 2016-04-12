@@ -42,18 +42,11 @@ def mse(np.ndarray[FLOAT_DTYPE_t, ndim=1] x):
     cdef int mse_i = -1
     cdef int i, j, prev
 
-    cdef list changepts = []
-    for i in xrange(1, xsize):
-        if x[i] != x[i-1]:
-            changepts.append(i)
-    if len(changepts) == 0:
-        return 0.0, -1
-
     x1sum = 0
     x2sum = x.sum()
     mse_i = -1
     prev = 0
-    for i in changepts:
+    for i in xrange(1, xsize):
         # compute new means
         for j in xrange(prev, i):
             x1sum += x[j]
