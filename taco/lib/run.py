@@ -31,12 +31,10 @@ __status__ = "Development"
 class Args:
     VERBOSE = False
     NUM_PROCESSES = 1
-    GUIDED_ASSEMBLY = False
-    GUIDED_STRAND = False
-    GUIDED_ENDS = False
     GTF_EXPR_ATTR = 'FPKM'
-    MIN_TRANSFRAG_LENGTH = 200
-    MIN_EXPR = 0.5
+    FILTER_SPLICE_JUNCS = False
+    FILTER_MIN_LENGTH = 200
+    FILTER_MIN_EXPR = 0.5
     ISOFORM_FRAC = 0.05
     MAX_ISOFORMS = 0
     ASSEMBLE_UNSTRANDED = False
@@ -48,6 +46,9 @@ class Args:
     PATH_GRAPH_LOSS_THRESHOLD = 0.10
     PATH_FRAC = 0.0
     MAX_PATHS = 0
+    GUIDED_ASSEMBLY = False
+    GUIDED_STRAND = False
+    GUIDED_ENDS = False
     RESUME = False
     ASSEMBLE = None
     OUTPUT_DIR = 'taco'
@@ -58,8 +59,13 @@ class Args:
     def create():
         parser = argparse.ArgumentParser(description=Args.DESCRIPTION)
         advgrp = parser.add_argument_group('Advanced Options',
-                                           '(modify for development '
-                                           'purposes only)')
+                                           '(recommend leaving at their '
+                                           'default settings for most '
+                                           'purposes)')
+        newgrp = parser.add_argument_group('Future Options',
+                                           '(features currently in '
+                                           'development)')
+        parser.add_argument('sample_file', nargs='?')
         parser.add_argument('-v', '--verbose', dest='verbose',
                             action="store_true",
                             default=Args.VERBOSE,
@@ -71,49 +77,40 @@ class Args:
                             default=Args.NUM_PROCESSES,
                             help='Assembly loci in parallel with N '
                             'processes [default=%(default)s]')
-        parser.add_argument('--ref-gtf', dest='ref_gtf_file',
-                            metavar='<gtf_file>',
-                            default=None,
-                            help='Option reference GTF file of "true" '
-                            'validated transcripts to facilitate guided '
-                            'assembly and/or noise filtering')
-        parser.add_argument('--guided-strand', dest='guided_strand',
-                            action='store_true',
-                            default=Args.GUIDED_STRAND,
-                            help='Enable use of reference strand information '
-                            'to help resolve unstranded transfrags (requires '
-                            'reference GTF to be specified using --ref-gtf)')
-        parser.add_argument('--guided-ends', dest='guided_ends',
-                            action='store_true',
-                            default=Args.GUIDED_ENDS,
-                            help='Enable use of reference transcript start '
-                            'and end sites during assembly (requires '
-                            'reference GTF to be specified using --ref-gtf)')
-        parser.add_argument('--guided-assembly', dest='guided_assembly',
-                            action='store_true',
-                            default=Args.GUIDED_ASSEMBLY,
-                            help='Enable guided assembly (requires a '
-                            'reference GTF to be specified using '
-                            '--ref-gtf)')
         parser.add_argument('--gtf-expr-attr',
                             dest='gtf_expr_attr',
                             default=Args.GTF_EXPR_ATTR,
                             metavar='ATTR',
                             help='GTF attribute field containing '
                             'expression [default=%(default)s]')
-        parser.add_argument('--min-transfrag-length',
-                            dest='min_transfrag_length',
+        parser.add_argument('--filter-min-length',
+                            dest='filter_min_length',
                             type=int, metavar='N',
-                            default=Args.MIN_TRANSFRAG_LENGTH,
+                            default=Args.FILTER_MIN_LENGTH,
                             help='Filter input transfrags with length < N '
                             'prior to assembly [default=%(default)s]')
-        parser.add_argument('--min-expr',
-                            dest='min_expr',
+        parser.add_argument('--filter-min-expr',
+                            dest='filter_min_expr',
                             type=float, metavar='X',
-                            default=Args.MIN_EXPR,
+                            default=Args.FILTER_MIN_EXPR,
                             help='Filter input transfrags with expression '
                             '(gtf-expr-attr parameter) < X prior to assembly '
                             '[default=%(default)s]')
+        parser.add_argument('--filter-splice-juncs',
+                            dest='filter_splice_juncs',
+                            action='store_true',
+                            default=Args.FILTER_SPLICE_JUNCS,
+                            help='Filter input transfrags that possess '
+                            'non-canonical splice motifs prior to assembly. '
+                            'Splice motifs are GTAG and GCAG are allowed '
+                            '[default=%(default)s]. Requires genome sequence '
+                            'to be specified using --ref-genome-fasta.')
+        parser.add_argument('--ref-genome-fasta',
+                            dest='ref_genome_fasta_file',
+                            default=None,
+                            help='Reference genome sequence in FASTA format '
+                            'needed to assess splice junction motif sequences. '
+                            'Use in conjunction with --filter-splice-juncs.')
         parser.add_argument('--isoform-frac',
                             dest='isoform_frac', type=float, metavar='X',
                             default=Args.ISOFORM_FRAC,
@@ -208,7 +205,30 @@ class Args:
                             default=Args.MAX_PATHS,
                             help='dynamic programming algorithm will stop '
                             'after finding N paths [default=%(default)s]')
-        parser.add_argument('sample_file', nargs='?')
+        newgrp.add_argument('--ref-gtf', dest='ref_gtf_file',
+                            metavar='<gtf_file>',
+                            default=None,
+                            help='Option reference GTF file of "true" '
+                            'validated transcripts to facilitate guided '
+                            'assembly and/or noise filtering')
+        newgrp.add_argument('--guided-strand', dest='guided_strand',
+                            action='store_true',
+                            default=Args.GUIDED_STRAND,
+                            help='Enable use of reference strand information '
+                            'to help resolve unstranded transfrags (requires '
+                            'reference GTF to be specified using --ref-gtf)')
+        newgrp.add_argument('--guided-ends', dest='guided_ends',
+                            action='store_true',
+                            default=Args.GUIDED_ENDS,
+                            help='Enable use of reference transcript start '
+                            'and end sites during assembly (requires '
+                            'reference GTF to be specified using --ref-gtf)')
+        newgrp.add_argument('--guided-assembly', dest='guided_assembly',
+                            action='store_true',
+                            default=Args.GUIDED_ASSEMBLY,
+                            help='Enable guided assembly (requires a '
+                            'reference GTF to be specified using '
+                            '--ref-gtf)')
         return parser
 
     @staticmethod
@@ -228,8 +248,11 @@ class Args:
         func(fmt.format('verbose logging:', str(args.verbose)))
         func(fmt.format('num processes:', str(args.num_processes)))
         func(fmt.format('output directory:', str(args.output_dir)))
-        func(fmt.format('min transfrag length:', args.min_transfrag_length))
-        func(fmt.format('min expression:', args.min_expr))
+        func(fmt.format('filter min length:', args.filter_min_length))
+        func(fmt.format('filter min expression:', args.filter_min_expr))
+        func(fmt.format('filter splice juncs:', args.filter_splice_juncs))
+        func(fmt.format('reference genome FASTA file:',
+                        args.ref_genome_fasta_file))
         func(fmt.format('reference GTF file:', str(args.ref_gtf_file)))
         func(fmt.format('guided assembly mode:', str(args.guided_assembly)))
         func(fmt.format('guided strand mode:', str(args.guided_strand)))
@@ -247,41 +270,6 @@ class Args:
                         args.path_graph_loss_threshold))
         func(fmt.format('path frac:', args.path_frac))
         func(fmt.format('max paths:', args.max_paths))
-
-    @staticmethod
-    def validate(args):
-        if args.min_transfrag_length < 0:
-            parser.error("min_transfrag_length < 0")
-        if args.min_expr < 0:
-            parser.error("min_expr < 0")
-        if (args.isoform_frac < 0) or (args.isoform_frac > 1):
-            parser.error("isoform_frac out of range (0.0-1.0)")
-        if (args.max_isoforms < 0):
-            parser.error("max_isoforms < 0")
-
-        if not (0 <= args.path_graph_loss_threshold <= 1):
-            parser.error("loss_threshold not in range (0.0-1.0)")
-        if args.path_graph_kmax < 0:
-            parser.error("kmax must be >= 0")
-        if args.max_paths < 0:
-            parser.error("max_paths must be >= 0")
-        if not (0 <= args.path_frac <= 1):
-            parser.error("path_frac not in range (0.0-1.0)")
-
-        if args.change_point:
-            if not (0.0 <= args.change_point_pvalue <= 1.0):
-                parser.error('change point pvalue invalid')
-            if not (0.0 <= args.change_point_fold_change <= 1.0):
-                parser.error('change point fold change invalid')
-        if args.ref_gtf_file is not None:
-            if not os.path.exists(args.ref_gtf_file):
-                parser.error("reference GTF file %s not found" %
-                             (args.ref_gtf_file))
-            args.ref_gtf_file = os.path.abspath(args.ref_gtf_file)
-        elif (args.guided_assembly or args.guided_ends or
-              args.guided_strand):
-            parser.error('Guided assembly modes require a '
-                         'reference GTF (--ref-gtf)')
 
     @staticmethod
     def parse():
@@ -316,7 +304,49 @@ class Args:
             if not os.path.exists(args.sample_file):
                 parser.error('Sample file %s not found' % (args.sample_file))
             args.sample_file = os.path.abspath(args.sample_file)
-            Args.validate(args)
+
+            if args.filter_min_length < 0:
+                parser.error("filter_min_length < 0")
+            if args.filter_min_expr < 0:
+                parser.error("filter_min_expr < 0")
+            if (args.isoform_frac < 0) or (args.isoform_frac > 1):
+                parser.error("isoform_frac out of range (0.0-1.0)")
+            if (args.max_isoforms < 0):
+                parser.error("max_isoforms < 0")
+
+            if not (0 <= args.path_graph_loss_threshold <= 1):
+                parser.error("loss_threshold not in range (0.0-1.0)")
+            if args.path_graph_kmax < 0:
+                parser.error("kmax must be >= 0")
+            if args.max_paths < 0:
+                parser.error("max_paths must be >= 0")
+            if not (0 <= args.path_frac <= 1):
+                parser.error("path_frac not in range (0.0-1.0)")
+
+            if args.change_point:
+                if not (0.0 <= args.change_point_pvalue <= 1.0):
+                    parser.error('change point pvalue invalid')
+                if not (0.0 <= args.change_point_fold_change <= 1.0):
+                    parser.error('change point fold change invalid')
+
+            if args.filter_splice_juncs:
+                if not args.ref_genome_fasta_file:
+                    parser.error('Filtering of splice junctions enabled '
+                                 '(--filter-splice-juncs) but '
+                                 'reference genome FASTA file not specified')
+                if not os.path.exists(args.ref_genome_fasta_file):
+                    parser.error('Reference genome FASTA file not found')
+                args.ref_genome_fasta_file = os.path.abspath(args.ref_genome_fasta_file)
+
+            if args.ref_gtf_file is not None:
+                if not os.path.exists(args.ref_gtf_file):
+                    parser.error("reference GTF file %s not found" %
+                                 (args.ref_gtf_file))
+                args.ref_gtf_file = os.path.abspath(args.ref_gtf_file)
+            elif (args.guided_assembly or args.guided_ends or
+                  args.guided_strand):
+                parser.error('Guided assembly modes require a '
+                             'reference GTF (--ref-gtf)')
         return args
 
 

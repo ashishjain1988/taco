@@ -19,3 +19,5 @@ taco/lib/bx/intersection.c
 taco/lib/bx/cluster.c
 
 taco/lib/scipy/norm_sf.c
+
+taco/lib/pysam/cfaidx.c

@@ -51,7 +51,14 @@ cython_extensions = [
                        'taco/lib/scipy/mtherr.c',
                        'taco/lib/scipy/sf_error.c'],
               include_dirs=[numpy_inc, 'taco/lib/scipy'],
-              extra_compile_args=['-w'])
+              extra_compile_args=['-w']),
+    Extension('taco.lib.pysam.cfaidx',
+              sources=['taco/lib/pysam/cfaidx.pyx',
+                       'taco/lib/htslib/faidx.c',
+                       'taco/lib/htslib/bgzf.c',
+                       'taco/lib/htslib/hfile.c'],
+              include_dirs=['taco/lib/pysam',
+                            'taco/lib/htslib'])
 ]
 
 extensions = [
