@@ -107,12 +107,12 @@ class Transfrag(object):
         expr = float(fields[4])
         strand = Strand.from_bed(fields[5])
         num_exons = int(fields[9])
-        block_sizes = map(int, fields[10].split(','))
-        block_starts = map(int, fields[11].split(','))
+        block_sizes = fields[10].split(',')
+        block_starts = fields[11].split(',')
         exons = []
         for i in xrange(num_exons):
-            start = tx_start + block_starts[i]
-            end = start + block_sizes[i]
+            start = tx_start + int(block_starts[i])
+            end = start + int(block_sizes[i])
             exons.append(Exon(start, end))
         return Transfrag(chrom=chrom,
                          strand=strand,
