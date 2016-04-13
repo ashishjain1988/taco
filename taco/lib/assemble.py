@@ -612,7 +612,8 @@ def assemble_parallel(args, results, num_samples):
     header = '\t'.join(header)
     merge(input_files=[r.path_graph_stats_file for r in worker_results],
           output_file=results.path_graph_stats_file,
-          key=sort_key_bed)
+          key=sort_key_bed,
+          header=header)
     logging.debug('\tmerging assembly bed file')
     merge(input_files=[r.assembly_bed_file for r in worker_results],
           output_file=results.assembly_bed_file,
