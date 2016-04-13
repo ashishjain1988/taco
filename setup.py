@@ -58,7 +58,8 @@ cython_extensions = [
                        'taco/lib/htslib/bgzf.c',
                        'taco/lib/htslib/hfile.c'],
               include_dirs=['taco/lib/pysam',
-                            'taco/lib/htslib'])
+                            'taco/lib/htslib'],
+              libraries=['z'])
 ]
 
 extensions = [
