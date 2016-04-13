@@ -58,6 +58,8 @@ class Args:
     @staticmethod
     def create():
         parser = argparse.ArgumentParser(description=Args.DESCRIPTION)
+        rungrp = parser.add_argument_group('Run Options',
+                                           '(TACO modes)')
         advgrp = parser.add_argument_group('Advanced Options',
                                            '(recommend leaving at their '
                                            'default settings for most '
@@ -65,18 +67,37 @@ class Args:
         newgrp = parser.add_argument_group('Future Options',
                                            '(features currently in '
                                            'development)')
-        parser.add_argument('sample_file', nargs='?')
-        parser.add_argument('-v', '--verbose', dest='verbose',
+        rungrp.add_argument("-o", "--output-dir", dest="output_dir",
+                            metavar='DIR',
+                            default=Args.OUTPUT_DIR,
+                            help='directory where output files will be '
+                            'stored (if already exists then --resume must '
+                            'be specified) [default=%(default)s]')
+        rungrp.add_argument('-v', '--verbose', dest='verbose',
                             action="store_true",
                             default=Args.VERBOSE,
                             help='Enabled detailed logging '
                             '(for debugging)')
-        parser.add_argument('-p', '--num-processes', type=int,
+        rungrp.add_argument('-p', '--num-processes', type=int,
                             metavar='N',
                             dest='num_processes',
                             default=Args.NUM_PROCESSES,
-                            help='Assembly loci in parallel with N '
+                            help='Run TACO in parallel with N '
                             'processes [default=%(default)s]')
+        rungrp.add_argument('--resume', dest='resume',
+                            action='store_true',
+                            default=Args.RESUME,
+                            help='Resumes an existing run that may have '
+                            'ended prematurely. Specify the location of the '
+                            'run using the -o/--output-dir option.')
+        rungrp.add_argument('--assemble',
+                            dest='assemble',
+                            metavar='BED',
+                            default=Args.ASSEMBLE,
+                            help='Assemble transfrags produced by a previous '
+                            'TACO run, bypassing the GTF aggregation '
+                            'step. Accepts a taco-formatted BED file.')
+        parser.add_argument('sample_file', nargs='?')
         parser.add_argument('--gtf-expr-attr',
                             dest='gtf_expr_attr',
                             default=Args.GTF_EXPR_ATTR,
@@ -91,10 +112,10 @@ class Args:
                             'prior to assembly [default=%(default)s]')
         parser.add_argument('--filter-min-expr',
                             dest='filter_min_expr',
-                            type=float, metavar='X',
+                            type=float, metavar='MIN_TPM',
                             default=Args.FILTER_MIN_EXPR,
-                            help='Filter input transfrags with expression '
-                            '(gtf-expr-attr parameter) < X prior to assembly '
+                            help='Filter input transfrags with transcripts '
+                            'per milliion (TPM) < MIN_TPM prior to assembly '
                             '[default=%(default)s]')
         parser.add_argument('--filter-splice-juncs',
                             dest='filter_splice_juncs',
@@ -112,22 +133,17 @@ class Args:
                             'needed to assess splice junction motif sequences. '
                             'Use in conjunction with --filter-splice-juncs.')
         parser.add_argument('--isoform-frac',
-                            dest='isoform_frac', type=float, metavar='X',
+                            dest='isoform_frac', type=float, metavar='FRAC',
                             default=Args.ISOFORM_FRAC,
                             help='Report transcript isoforms with '
-                            'expression fraction >=X (0.0-1.0) of total '
-                            'gene expression [default=%(default)s]')
+                            'expression fraction >= FRAC (0.0-1.0) relative '
+                            'to the major isoform within each gene '
+                            '[default=%(default)s]')
         parser.add_argument('--max-isoforms', type=int, metavar='N',
                             dest='max_isoforms',
                             default=Args.MAX_ISOFORMS,
                             help='Maximum isoforms to report for each '
                             'gene [default=%(default)s]')
-        parser.add_argument("-o", "--output-dir", dest="output_dir",
-                            metavar='DIR',
-                            default=Args.OUTPUT_DIR,
-                            help='directory where output files will be '
-                            'stored (if already exists then --resume must '
-                            'be specified) [default=%(default)s]')
         parser.add_argument('--assemble-unstranded',
                             dest='assemble_unstranded',
                             action='store_true',
@@ -146,17 +162,6 @@ class Args:
         parser.add_argument('--no-change-point', dest='change_point',
                             action='store_false',
                             help='Disable change point detection')
-        parser.add_argument('--resume', dest='resume',
-                            action='store_true',
-                            default=Args.RESUME,
-                            help='resume a previous run in <dir>')
-        advgrp.add_argument('--assemble',
-                            dest='assemble',
-                            metavar='BED',
-                            default=Args.ASSEMBLE,
-                            help='Assemble transfrags produced by a previous '
-                            'TACO run, bypassing the GTF aggregation and '
-                            'step. Accepts a taco-formatted BED file')
         advgrp.add_argument('--change-point-pvalue', type=float,
                             dest='change_point_pvalue',
                             default=Args.CHANGE_POINT_PVALUE,
@@ -182,17 +187,18 @@ class Args:
                             action='store_false',
                             help='Disable trimming around change points')
         advgrp.add_argument('--path-kmax', dest='path_graph_kmax', type=int,
-                            metavar='k',
+                            metavar='kmax',
                             default=Args.PATH_GRAPH_KMAX,
-                            help='Maximize k-mer size of path graph '
+                            help='Limit optimization for choosing parameter k '
+                            'for path graph (DeBruijn graph) to k <= kmax '
                             '[default=%(default)s]')
         advgrp.add_argument('--path-graph-loss-threshold', type=float,
                             dest='path_graph_loss_threshold',
-                            metavar='X',
+                            metavar='FRAC',
                             default=Args.PATH_GRAPH_LOSS_THRESHOLD,
-                            help='Tolerate loss of X (0.0-1.0) fraction of '
-                            'total gene expression while optimizing the '
-                            'assembly parameter "k" [default=%(default)s]')
+                            help='Limit loss < FRAC (0.0-1.0) fraction of '
+                            'total transfrag expression while optimizing the '
+                            'assembly parameter k [default=%(default)s]')
         advgrp.add_argument('--path-frac', type=float, metavar='X',
                             dest='path_frac',
                             default=Args.PATH_FRAC,

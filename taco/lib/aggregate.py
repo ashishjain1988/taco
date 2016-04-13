@@ -264,7 +264,7 @@ def aggregate_parallel(samples, args, results):
         fields = line.split('\t', 1)
         return fields[0]
     stats_header = ['sample_id', 'num_transfrags', 'filtered_length',
-                    'filtered_expr', 'filtered_splice']
+                    'filtered_expr', 'filtered_splice\n']
     stats_header = '\t'.join(stats_header)
     merge_files(input_files=[r.sample_stats_file for r in worker_results],
                 output_file=results.sample_stats_file,
