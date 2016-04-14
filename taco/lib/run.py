@@ -64,9 +64,9 @@ class Args:
                                            '(recommend leaving at their '
                                            'default settings for most '
                                            'purposes)')
-        newgrp = parser.add_argument_group('Future Options',
-                                           '(features currently in '
-                                           'development)')
+        # guidedgrp = parser.add_argument_group('Guided-Assembly Options',
+        #                                       '(DO NOT USE: under '
+        #                                       'development)')
         rungrp.add_argument("-o", "--output-dir", dest="output_dir",
                             metavar='DIR',
                             default=Args.OUTPUT_DIR,
@@ -211,30 +211,34 @@ class Args:
                             default=Args.MAX_PATHS,
                             help='dynamic programming algorithm will stop '
                             'after finding N paths [default=%(default)s]')
-        newgrp.add_argument('--ref-gtf', dest='ref_gtf_file',
+        parser.add_argument('--ref-gtf', dest='ref_gtf_file',
                             metavar='<gtf_file>',
                             default=None,
-                            help='Option reference GTF file of "true" '
-                            'validated transcripts to facilitate guided '
-                            'assembly and/or noise filtering')
-        newgrp.add_argument('--guided-strand', dest='guided_strand',
+                            help=argparse.SUPPRESS)
+                            # help='Option reference GTF file of "true" '
+                            # 'validated transcripts to facilitate guided '
+                            # 'assembly and/or noise filtering')
+        parser.add_argument('--guided-strand', dest='guided_strand',
                             action='store_true',
                             default=Args.GUIDED_STRAND,
-                            help='Enable use of reference strand information '
-                            'to help resolve unstranded transfrags (requires '
-                            'reference GTF to be specified using --ref-gtf)')
-        newgrp.add_argument('--guided-ends', dest='guided_ends',
+                            help=argparse.SUPPRESS)
+                            # help='Enable use of reference strand information '
+                            # 'to help resolve unstranded transfrags (requires '
+                            # 'reference GTF to be specified using --ref-gtf)')
+        parser.add_argument('--guided-ends', dest='guided_ends',
                             action='store_true',
                             default=Args.GUIDED_ENDS,
-                            help='Enable use of reference transcript start '
-                            'and end sites during assembly (requires '
-                            'reference GTF to be specified using --ref-gtf)')
-        newgrp.add_argument('--guided-assembly', dest='guided_assembly',
+                            help=argparse.SUPPRESS)
+                            # help='Enable use of reference transcript start '
+                            # 'and end sites during assembly (requires '
+                            # 'reference GTF to be specified using --ref-gtf)')
+        parser.add_argument('--guided-assembly', dest='guided_assembly',
                             action='store_true',
                             default=Args.GUIDED_ASSEMBLY,
-                            help='Enable guided assembly (requires a '
-                            'reference GTF to be specified using '
-                            '--ref-gtf)')
+                            help=argparse.SUPPRESS)
+                            # help='Enable guided assembly (requires a '
+                            # 'reference GTF to be specified using '
+                            # '--ref-gtf)')
         return parser
 
     @staticmethod
