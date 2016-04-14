@@ -1,5 +1,5 @@
 '''
-TACO: Transcriptome meta-assembly from RNA-Seq
+TACO: Multi-sample transcriptome assembly from RNA-Seq
 '''
 
 __author__ = "Matthew Iyer and Yashar Niknafs"

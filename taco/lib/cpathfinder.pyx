@@ -24,57 +24,34 @@ cdef find_path(int* nodes, int nnodes,
                int n, int source, int sink):
     cdef array.array int_array_template = array.array('i')
     cdef array.array float_array_template = array.array('f')
-    cdef array.array min_exprs_arr, sum_exprs_arr, lengths_arr, prevs_arr
-    cdef float *min_exprs, *sum_exprs
-    cdef int *lengths, *prevs
-    cdef float min_expr, sum_expr, new_min_expr, new_sum_expr
-    cdef float new_avg_expr, cur_avg_expr
-    cdef int x, i, j, length, new_length, prev
+    cdef array.array min_exprs_arr, prevs_arr
+    cdef float *min_exprs
+    cdef int *prevs
+    cdef float min_expr, new_min_expr
+    cdef int x, i, j, prev
     cdef list path
 
     # allocate data structures
     min_exprs_arr = array.clone(float_array_template, n, zero=False)
-    sum_exprs_arr = array.clone(float_array_template, n, zero=False)
-    lengths_arr = array.clone(int_array_template, n, zero=False)
     prevs_arr = array.clone(int_array_template, n, zero=False)
 
     # initialize data structures
     min_exprs = min_exprs_arr.data.as_floats
-    sum_exprs = sum_exprs_arr.data.as_floats
-    lengths = lengths_arr.data.as_ints
     prevs = prevs_arr.data.as_ints
     for i in xrange(n):
         min_exprs[i] = MIN_SCORE
-        sum_exprs[i] = MIN_SCORE
-        lengths[i] = 1
         prevs[i] = sink
     min_exprs[source] = exprs[source]
-    sum_exprs[source] = exprs[source]
 
     # traverse nodes in topological sort order
     for x in xrange(nnodes):
         i = nodes[x]
         min_expr = min_exprs[i]
-        sum_expr = sum_exprs[i]
-        length = lengths[i]
 
         for j in succs[i]:
             new_min_expr = min_expr if min_expr < exprs[j] else exprs[j]
-            new_sum_expr = sum_expr + exprs[j]
-            new_length = length + 1
-            new_avg_expr = new_sum_expr / new_length
-            cur_avg_expr = sum_exprs[j] / lengths[j]
-
-            # update node if 1) not yet visited, 2) can reach this node
-            # with a higher min expr, or 3) can reach with an equal
-            # min expr but a higher overall average expr
-#            if ((prevs[j] == sink) or (new_min_expr > min_exprs[j]) or
-#                (new_min_expr == min_exprs[j] and
-#                 new_avg_expr > cur_avg_expr)):
             if ((prevs[j] == sink) or (new_min_expr > min_exprs[j])):
                 min_exprs[j] = new_min_expr
-                sum_exprs[j] = new_sum_expr
-                lengths[j] = new_length
                 prevs[j] = i
 
     # traceback to get path

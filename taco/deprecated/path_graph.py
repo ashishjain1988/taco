@@ -1,5 +1,5 @@
 '''
-TACO: Transcriptome meta-assembly from RNA-Seq
+TACO: Multi-sample transcriptome assembly from RNA-Seq
 '''
 import networkx as nx
 import logging

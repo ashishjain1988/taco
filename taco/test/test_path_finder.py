@@ -1,5 +1,5 @@
 '''
-TACO: Transcriptome meta-assembly from RNA-Seq
+TACO: Multi-sample transcriptome assembly from RNA-Seq
 '''
 from taco.lib.base import Strand
 from taco.lib.splice_graph import SpliceGraph

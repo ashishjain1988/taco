@@ -1,5 +1,5 @@
 '''
-TACO: Transcriptome meta-assembly from RNA-Seq
+TACO: Multi-sample transcriptome assembly from RNA-Seq
 '''
 import os
 import shutil
@@ -199,7 +199,6 @@ def assemble_isoforms(sgraph, config):
     # read in transfrag paths
     pgf = PathGraphFactory(sgraph)
     K, k = pgf.create_optimal(kmax=config.path_graph_kmax,
-                              loss_threshold=config.path_graph_loss_threshold,
                               stats_fh=config.path_graph_stats_fh)
     if K is None or len(K) == 0:
         return []
@@ -519,7 +518,6 @@ def assemble_parallel(args, results, num_samples):
     - change_point_fold_change
     - change_point_trim
     - path_graph_kmax
-    - path_graph_loss_threshold
     - path_frac
     - max_paths
     - isoform_frac

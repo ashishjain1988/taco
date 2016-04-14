@@ -1,5 +1,5 @@
 '''
-TACO: Transcriptome meta-assembly from RNA-Seq
+TACO: Multi-sample transcriptome assembly from RNA-Seq
 '''
 import logging
 import array
@@ -116,12 +116,11 @@ class PathGraphFactory(object):
         K.valid = K.is_valid()
         return K
 
-    def create_optimal(self, kmax=0, loss_threshold=0.10, stats_fh=None):
+    def create_optimal(self, kmax=0, stats_fh=None):
         '''
         create a graph where nodes are paths of length 'k'. the parameter
         'k' is chosen to maximizing the number of reachable k-mers in the
-        path graph while tolerating at most 'loss_threshold' percent of
-        expression.
+        path graph
         '''
         if len(self.paths) == 0:
             return None, 0
@@ -147,8 +146,6 @@ class PathGraphFactory(object):
                 print >>stats_fh, '\t'.join(map(str, fields))
             if not K.valid:
                 return -k
-            #if lost_expr_frac > loss_threshold:
-            #    return -k
             return len(K)
 
         k, num_kmers = maximize_bisect(compute_kmers, 1, kmax, 0)

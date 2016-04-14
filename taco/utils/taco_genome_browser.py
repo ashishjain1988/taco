@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 '''
-TACO: Transcriptome meta-assembly from RNA-Seq
+TACO: Multi-sample transcriptome assembly from RNA-Seq
 '''
 import os
 import sys

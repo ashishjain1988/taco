@@ -1,5 +1,5 @@
 '''
-TACO: Transcriptome meta-assembly from RNA-Seq
+TACO: Multi-sample transcriptome assembly from RNA-Seq
 '''
 from distutils.core import setup
 from distutils.extension import Extension
@@ -72,7 +72,7 @@ extensions = [
 def main():
     setup(name='taco',
           version=__version__,
-          description='transcriptome meta-assembly from rna-seq',
+          description='transcriptome meta-assembly for rna-seq',
           author='Matthew Iyer, Yashar Niknafs, Balaji Pandian',
           author_email='yniknafs@umich.edu',
           requires=['numpy', 'cython'],

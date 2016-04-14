@@ -1,5 +1,5 @@
 '''
-TACO: Transcriptome meta-assembly from RNA-Seq
+TACO: Multi-sample transcriptome assembly from RNA-Seq
 '''
 from taco.lib.graph import Graph
 from taco.lib.path_graph import PathGraphFactory

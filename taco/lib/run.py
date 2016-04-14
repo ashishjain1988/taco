@@ -1,9 +1,6 @@
 '''
-TACO: Transcriptome meta-assembly from RNA-Seq
-Copyright (C) 2012-2015 Matthew Iyer
-
-@author: mkiyer
-@author: yniknafs
+TACO: Multi-sample transcriptome assembly from RNA-Seq
+Copyright (C) 2012-2016
 '''
 import os
 import argparse
@@ -39,11 +36,10 @@ class Args:
     MAX_ISOFORMS = 0
     ASSEMBLE_UNSTRANDED = False
     CHANGE_POINT = True
-    CHANGE_POINT_PVALUE = 0.001
+    CHANGE_POINT_PVALUE = 0.01
     CHANGE_POINT_FOLD_CHANGE = 0.85
     CHANGE_POINT_TRIM = True
     PATH_GRAPH_KMAX = 0
-    PATH_GRAPH_LOSS_THRESHOLD = 0.10
     PATH_FRAC = 0.0
     MAX_PATHS = 0
     GUIDED_ASSEMBLY = False
@@ -53,7 +49,7 @@ class Args:
     ASSEMBLE = None
     OUTPUT_DIR = 'taco'
     PROG = 'taco'
-    DESCRIPTION = 'TACO: Meta-assembly of RNA-Seq datasets'
+    DESCRIPTION = 'TACO: Multi-sample transcriptome assembly from RNA-Seq'
 
     @staticmethod
     def create():
@@ -112,10 +108,10 @@ class Args:
                             'prior to assembly [default=%(default)s]')
         parser.add_argument('--filter-min-expr',
                             dest='filter_min_expr',
-                            type=float, metavar='MIN_TPM',
+                            type=float, metavar='X',
                             default=Args.FILTER_MIN_EXPR,
                             help='Filter input transfrags with transcripts '
-                            'per milliion (TPM) < MIN_TPM prior to assembly '
+                            'per milliion (TPM) < X prior to assembly '
                             '[default=%(default)s]')
         parser.add_argument('--filter-splice-juncs',
                             dest='filter_splice_juncs',
@@ -192,13 +188,6 @@ class Args:
                             help='Limit optimization for choosing parameter k '
                             'for path graph (DeBruijn graph) to k <= kmax '
                             '[default=%(default)s]')
-        advgrp.add_argument('--path-graph-loss-threshold', type=float,
-                            dest='path_graph_loss_threshold',
-                            metavar='FRAC',
-                            default=Args.PATH_GRAPH_LOSS_THRESHOLD,
-                            help='Limit loss < FRAC (0.0-1.0) fraction of '
-                            'total transfrag expression while optimizing the '
-                            'assembly parameter k [default=%(default)s]')
         advgrp.add_argument('--path-frac', type=float, metavar='X',
                             dest='path_frac',
                             default=Args.PATH_FRAC,
@@ -276,8 +265,6 @@ class Args:
         func(fmt.format('change point fold change:',
                         str(args.change_point_fold_change)))
         func(fmt.format('change point trim:', str(args.change_point_trim)))
-        func(fmt.format('path graph loss threshold:',
-                        args.path_graph_loss_threshold))
         func(fmt.format('path frac:', args.path_frac))
         func(fmt.format('max paths:', args.max_paths))
 
@@ -324,8 +311,6 @@ class Args:
             if (args.max_isoforms < 0):
                 parser.error("max_isoforms < 0")
 
-            if not (0 <= args.path_graph_loss_threshold <= 1):
-                parser.error("loss_threshold not in range (0.0-1.0)")
             if args.path_graph_kmax < 0:
                 parser.error("kmax must be >= 0")
             if args.max_paths < 0:

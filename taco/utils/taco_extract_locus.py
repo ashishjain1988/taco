@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 '''
-TACO: Transcriptome meta-assembly from RNA-Seq
+TACO: Multi-sample transcriptome assembly from RNA-Seq
 
 Utility script that extracts the GTF features for an individual locus.
 '''
