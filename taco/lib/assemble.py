@@ -605,9 +605,9 @@ def assemble_parallel(args, results, num_samples):
           key=sort_key_gtf)
     logging.debug('\tmerging path graph stats file')
     header = ['chrom', 'start', 'end', 'strand', 'k', 'kmax', 'transfrags',
-              'short_transfrags', 'lost_short', 'kmers', 'lost_kmers',
-              'tot_expr', 'graph_expr', 'expr_frac', 'valid', 'opt',
-              'is_opt\n']
+              'short_transfrags', 'short_expr', 'lost_short', 'lost_short_expr',
+              'kmers', 'lost_kmers', 'tot_expr', 'graph_expr', 'expr_frac',
+              'valid', 'opt', 'is_opt\n']
     header = '\t'.join(header)
     merge(input_files=[r.path_graph_stats_file for r in worker_results],
           output_file=results.path_graph_stats_file,

@@ -77,6 +77,7 @@ class PathGraphFactory(object):
     def create(self, k):
         short_transfrags = []
         graph_expr = 0.0
+        short_expr = 0.0
         K = PathGraph()
         for i in xrange(len(self.paths)):
             path = self.paths[i]
@@ -84,6 +85,7 @@ class PathGraphFactory(object):
             short = len(path) < k
             if short and not full_length:
                 short_transfrags.append(i)
+                short_expr += self.exprs[i]
                 continue
 
             kmers = []
@@ -111,19 +113,21 @@ class PathGraphFactory(object):
         K.k = k
         K.num_lost_kmers = num_lost_kmers
         K.graph_expr = graph_expr
+        K.short_expr = short_expr
         K.short_transfrags = short_transfrags
         K.valid = K.is_valid()
         return K
 
-    def get_stats(self, K, kmax=None, lost_short=0, is_opt=0):
+    def get_stats(self, K, kmax=None, lost_short=0, lost_short_expr=0.0, is_opt=0):
         if kmax is None:
             kmax = self.longest_path_length
         expr_frac = 0.0 if self.total_expr == 0 else K.graph_expr / self.total_expr
         opt = int(round(expr_frac * len(K)))
         fields = [self.chrom, self.start, self.end, Strand.to_gtf(self.strand),
                   K.k, kmax, len(self.paths), len(K.short_transfrags),
-                  lost_short, len(K), K.num_lost_kmers, self.total_expr,
-                  K.graph_expr, expr_frac, int(K.valid), opt, is_opt]
+                  K.short_expr, lost_short, lost_short_expr,
+                  len(K), K.num_lost_kmers, self.total_expr, K.graph_expr,
+                  expr_frac, int(K.valid), opt, is_opt]
         return fields
 
     def create_optimal(self, kmax=0, stats_fh=None):
@@ -150,8 +154,11 @@ class PathGraphFactory(object):
                 print >>stats_fh, '\t'.join(map(str, fields))
             if not K.valid:
                 return -k
-            return len(K)
-            #return int(round(expr_frac * len(K)))
+            # optimize based on kmers only (commented out)
+            #return len(K)
+            # optimize based on kmers weighted by fraction of total
+            # transcript expression retained in the path graph
+            return int(round(expr_frac * len(K)))
 
         k, num_kmers = maximize_bisect(compute_kmers, 1, kmax, 0)
         logging.debug('%s creating path graph k=%d num_kmers=%d' %
@@ -159,11 +166,15 @@ class PathGraphFactory(object):
         K = self.create(k)
         logging.debug('%s rescuing short transfrags kmers=%d' %
                       (str(self), len(K)))
-        num_lost = self.rescue_short_transfrags(K, K.short_transfrags)
+        lost_short, lost_short_expr = \
+            self.rescue_short_transfrags(K, K.short_transfrags)
         logging.debug('%s lost %d of %d short transfrags' %
-                      (str(self), num_lost, len(K.short_transfrags)))
+                      (str(self), lost_short, len(K.short_transfrags)))
         if stats_fh:
-            fields = self.get_stats(K, kmax=kmax, lost_short=num_lost, is_opt=1)
+            fields = self.get_stats(K, kmax=kmax,
+                                    lost_short=lost_short,
+                                    lost_short_expr=lost_short_expr,
+                                    is_opt=1)
             print >>stats_fh, '\t'.join(map(str, fields))
         return K, k
 
@@ -172,7 +183,8 @@ class PathGraphFactory(object):
         sai = K.get_suffix_array_index()
         # align short transfrags to index
         kmer_exprs = []
-        lost_transfrags = []
+        lost_short = 0
+        lost_short_expr = 0.0
         for i in indexes:
             # align to find matching kmers
             tot_expr = 0.0
@@ -191,14 +203,15 @@ class PathGraphFactory(object):
                     new_expr = self.exprs[i] * (kmer_expr / tot_expr)
                 matching_paths.append((kmer_id, new_expr))
             if len(matching_paths) == 0:
-                lost_transfrags.append(i)
+                lost_short += 1
+                lost_short_expr += self.exprs[i]
             kmer_exprs.extend(matching_paths)
         # add short transfrag kmers
         for kmer_id, expr in kmer_exprs:
             K.exprs[kmer_id] += expr
             K.smooth_rev[kmer_id] += expr
             K.smooth_fwd[kmer_id] += expr
-        return len(lost_transfrags)
+        return lost_short, lost_short_expr
 
 
 class PathGraph(Graph):
