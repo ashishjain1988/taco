@@ -28,108 +28,15 @@ __status__ = "Development"
 
 
 DNA_COMPLEMENT_DICT = {'A':'T', 'T':'A', 'G':'C', 'C':'G', 'N': 'N'}
-SPLICE_MOTIFS_ALLOWED = {'GTAG', 'GCAG'}
-
 
 def dna_reverse_complement(seq):
     return ''.join(DNA_COMPLEMENT_DICT[x] for x in reversed(seq.upper()))
-
-
-def parse_gtf(gtf_iter, sample_id, gtf_expr_attr, is_ref):
-    '''
-    returns list of Transfrag objects
-    '''
-    t_dict = collections.OrderedDict()
-    total_expr = 0.0
-    cur_t_id = 1
-    for gtf_line in gtf_iter:
-        f = GTF.Feature.from_str(gtf_line)
-        if f.feature == 'transcript':
-            t_id = f.attrs[GTF.Attr.TRANSCRIPT_ID]
-            if t_id in t_dict:
-                raise GTFError("Transcript '%s' duplicate detected" % t_id)
-            # rename transcript id
-            new_t_id = "%s.%d" % (sample_id, cur_t_id)
-            cur_t_id += 1
-            # parse expression
-            if is_ref:
-                expr = 0.0
-            else:
-                if gtf_expr_attr not in f.attrs:
-                    raise GTFError("GTF expression attribute '%s' not found" %
-                                   (gtf_expr_attr))
-                expr = float(f.attrs[gtf_expr_attr])
-                total_expr += expr
-            # create transfrag
-            t = Transfrag(chrom=f.seqid,
-                          strand=Strand.from_gtf(f.strand),
-                          _id=new_t_id,
-                          expr=float(expr),
-                          is_ref=is_ref,
-                          exons=None)
-            t_dict[t_id] = t
-        elif f.feature == 'exon':
-            t_id = f.attrs[GTF.Attr.TRANSCRIPT_ID]
-            if t_id not in t_dict:
-                logging.error('Feature: "%s"' % str(f))
-                raise GTFError("Transcript '%s' exon feature appeared in "
-                               "gtf file prior to transcript feature" %
-                               t_id)
-            t = t_dict[t_id]
-            t.exons.append(Exon(f.start, f.end))
-    return t_dict.values(), total_expr
-
 
 def aggregate_sample(sample, gtf_expr_attr, is_ref, min_length, min_expr,
                      filter_splice_juncs, genome_fasta_fh,
                      bed_file_name, filtered_bed_file_name):
     logging.debug('Aggregate sample %s: %s' % (sample._id, sample.gtf_file))
-
-    caggregate(sample.gtf_file, str(sample._id), gtf_expr_attr, str(is_ref), bed_file_name, filtered_bed_file_name)
-    print "Got Out"
-    sys.exit(1)
-
-    # read all transcripts
-    with open(sample.gtf_file) as fh:
-        transcripts, total_expr = parse_gtf(fh, sample._id, gtf_expr_attr, is_ref, bed_file_name, filtered_bed_file_name)
-
-    # track filtering stats
-    nlength = 0
-    nexpr = 0
-    nsplice = 0
-    for t in transcripts:
-        # normalize expression
-        if total_expr > 0:
-            t.expr = 1.0e6 * t.expr / total_expr
-
-        # check filter conditions
-        keep = True
-        if t.length < min_length:
-            keep = False
-            nlength += 1
-        if t.expr < min_expr:
-            keep = False
-            nexpr += 1
-        if filter_splice_juncs:
-            # remove transfrags with non-canonical splice motifs
-            for start, end in t.iterintrons():
-                s = genome_fasta_fh.fetch(t.chrom, start, start + 2)
-                s += genome_fasta_fh.fetch(t.chrom, end - 2, end)
-                if t.strand == Strand.NEG:
-                    s = dna_reverse_complement(s)
-                if s not in SPLICE_MOTIFS_ALLOWED:
-                    keep = False
-                    nsplice += 1
-
-        # write transcript to bed
-        line = '\t'.join(t.to_bed())
-        if keep:
-            print >>bed_fh, line
-        else:
-            print >>filtered_bed_fh, line
-    fields = [sample._id, len(transcripts), nlength, nexpr, nsplice]
-    print >>stats_fh, '\t'.join(map(str, fields))
-
+    caggregate(sample.gtf_file, str(sample._id), gtf_expr_attr, str(is_ref), bed_file_name, filtered_bed_file_name, float(min_length), float(min_expr), str(filter_splice_juncs))
 
 def aggregate_worker(input_queue, args, output_dir):
     results = Results(output_dir)
@@ -165,6 +72,7 @@ def aggregate_worker(input_queue, args, output_dir):
     if genome_fasta_fh:
         genome_fasta_fh.close()
 
+    sys.exit(1)
     # sort output files
     logging.debug('Sorting aggregated files: "%s"' % (output_dir))
     # sort bed file

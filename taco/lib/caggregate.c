@@ -5,7 +5,7 @@
 //  Copyright © 2016 Balaji Pandian. All rights reserved.
 //
 //  TODO:
-//
+//  Remove transfrags with non-canonical splice motifs
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -117,6 +117,15 @@ void free_all_hashtable_nodes(khash_t(aggregate_hash)* hash_table) {
     kh_destroy(aggregate_hash, hash_table);
 }
 
+unsigned long long transfrag_length(const Hash_node* node) {
+    unsigned long long sum = 0;
+    for (unsigned long long i = 0; i < node->exon_array_length; i++) {
+        sum += (node->exon_end_array[i] - node->exon_start_array[i]);
+    }
+
+    return sum;
+}
+
 static PyObject* py_caggregate(PyObject* self, PyObject* args) {
     char* gtf_file;
     char* sample_id;
@@ -124,9 +133,19 @@ static PyObject* py_caggregate(PyObject* self, PyObject* args) {
     char* is_ref;
     char* bed_filename;
     char* filtered_bed_filename;
+    double min_length;
+    double min_expr;
+    char* filter_splice_juncs_string;
+    bool filter_splice_juncs;
 
-    if (!PyArg_ParseTuple(args, "ssssss", &gtf_file, &sample_id, &gtf_expr_attr, &is_ref, &bed_filename, &filtered_bed_filename)) {
+    if (!PyArg_ParseTuple(args, "ssssssdds", &gtf_file, &sample_id, &gtf_expr_attr, &is_ref, &bed_filename, &filtered_bed_filename, &min_length, &min_expr, &filter_splice_juncs_string)) {
         return NULL;
+    }
+
+    if (strcmp(filter_splice_juncs_string, "True") == 0) {
+        filter_splice_juncs = true;
+    } else {
+        filter_splice_juncs = false;
     }
 
     size_t bufflen = MAX_GTF_LINE_SIZE;
@@ -140,12 +159,12 @@ static PyObject* py_caggregate(PyObject* self, PyObject* args) {
         return NULL;
     }
 
-    FILE* bed_file_handler = fopen(bed_filename, "w");
+    FILE* bed_file_handler = fopen(bed_filename, "a");
     if (bed_file_handler == NULL) {
         return NULL;
     }
 
-    FILE* filtered_bed_file_handler = fopen(filtered_bed_filename, "w");
+    FILE* filtered_bed_file_handler = fopen(filtered_bed_filename, "a");
     if (filtered_bed_file_handler == NULL) {
         return NULL;
     }
@@ -235,17 +254,55 @@ static PyObject* py_caggregate(PyObject* self, PyObject* args) {
 
     Hash_node* node;
     kh_foreach_value(hash_table, node, {
-        if (strcmp(node->id, "1.2") != 0) {
-            continue;
+        // Normalize expresion
+        if (total_expr > 0) {
+            node->expr = 1000000 * node->expr / total_expr;
         }
-        printf("%s\n", node->id);
-        printf("%f\n", node->expr);
+
+        // check filter conditions
+        bool keep = true;
+        if (transfrag_length(node) < min_length) {
+            keep = false;
+            nlength += 1;
+        }
+        if (node->expr < min_expr) {
+            keep = false;
+            nexpr += 1;
+        }
+
+        if (filter_splice_juncs) {
+            // Remove transfrags with non-canonical splice motifs
+            // TODO
+        }
+
+        FILE* output_file;
+        if (keep) {
+            output_file = bed_file_handler;
+        } else {
+            output_file = filtered_bed_file_handler;
+        }
+
+        fprintf(output_file, "%s\t%llu\t%llu\t%s\t%.10f\t%c\t0\t0\t0\t%llu\t", node->chrom, node->exon_start_array[0], node->exon_end_array[node->exon_array_length-1], node->id, node->expr, node->strand, node->exon_array_length);
+
         for (unsigned long long i = 0; i < node->exon_array_length; i++) {
-            printf("S: %llu\n", node->exon_start_array[i]);
-            printf("E: %llu\n", node->exon_end_array[i]);
+            if (i == node->exon_array_length - 1) {
+                // last element -- don't add comma
+                fprintf(output_file, "%llu", (node->exon_end_array[i] - node->exon_start_array[i]));
+            } else {
+                fprintf(output_file, "%llu,", (node->exon_end_array[i] - node->exon_start_array[i]));
+            }
         }
-        printf("\n");
-        return NULL;
+        fprintf(output_file, "\t");
+
+        for (unsigned long long i = 0; i < node->exon_array_length; i++) {
+            if (i == node->exon_array_length - 1) {
+                fprintf(output_file, "%llu", (node->exon_start_array[i] - node->exon_start_array[0]));
+            } else {
+                fprintf(output_file, "%llu,", (node->exon_start_array[i] - node->exon_start_array[0]));
+            }
+        }
+
+        fprintf(output_file, "\n");
     });
 
     fclose(gtf_file_handler);
