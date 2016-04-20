@@ -14,6 +14,7 @@ from batch_sort import merge_files
 from base import Exon, Strand, Sample, Results, TacoError
 from transfrag import Transfrag
 from gtf import GTF, GTFError
+from caggregate import caggregate
 
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
@@ -81,11 +82,16 @@ def parse_gtf(gtf_iter, sample_id, gtf_expr_attr, is_ref):
 
 def aggregate_sample(sample, gtf_expr_attr, is_ref, min_length, min_expr,
                      filter_splice_juncs, genome_fasta_fh,
-                     bed_fh, filtered_bed_fh, stats_fh):
+                     bed_file_name, filtered_bed_file_name):
     logging.debug('Aggregate sample %s: %s' % (sample._id, sample.gtf_file))
+
+    caggregate(sample.gtf_file, str(sample._id), gtf_expr_attr, str(is_ref), bed_file_name, filtered_bed_file_name)
+    print "Got Out"
+    sys.exit(1)
+
     # read all transcripts
     with open(sample.gtf_file) as fh:
-        transcripts, total_expr = parse_gtf(fh, sample._id, gtf_expr_attr, is_ref)
+        transcripts, total_expr = parse_gtf(fh, sample._id, gtf_expr_attr, is_ref, bed_file_name, filtered_bed_file_name)
 
     # track filtering stats
     nlength = 0
@@ -138,10 +144,6 @@ def aggregate_worker(input_queue, args, output_dir):
     genome_fasta_fh = None
     if args.filter_splice_juncs and args.ref_genome_fasta_file:
         genome_fasta_fh = FastaFile(args.ref_genome_fasta_file)
-    # setup output files
-    bed_fh = open(tmp_results.transfrags_bed_file, 'w')
-    filtered_bed_fh = open(tmp_results.transfrags_filtered_bed_file, 'w')
-    stats_fh = open(results.sample_stats_file, 'w')
     # process samples via input queue
     while True:
         sample = input_queue.get()
@@ -154,15 +156,12 @@ def aggregate_worker(input_queue, args, output_dir):
                          min_expr=args.filter_min_expr,
                          filter_splice_juncs=args.filter_splice_juncs,
                          genome_fasta_fh=genome_fasta_fh,
-                         bed_fh=bed_fh,
-                         filtered_bed_fh=filtered_bed_fh,
-                         stats_fh=stats_fh)
+                         bed_file_name=tmp_results.transfrags_bed_file,
+                         filtered_bed_file_name=tmp_results.transfrags_filtered_bed_file
+                         )
         input_queue.task_done()
     input_queue.task_done()
     # cleanup and close files
-    bed_fh.close()
-    filtered_bed_fh.close()
-    stats_fh.close()
     if genome_fasta_fh:
         genome_fasta_fh.close()
 
