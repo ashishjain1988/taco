@@ -53,33 +53,30 @@ class PathGraphFactory(object):
         self.start = sgraph.start
         self.end = sgraph.end
         self.strand = sgraph.strand
-        self.transfrags = []
         self.paths = []
         self.exprs = []
         self.has_source = []
         self.has_sink = []
+        self.total_expr = 0.0
+        self.longest_path_length = 0
         start_nodes, stop_nodes = sgraph.get_start_stop_nodes()
         for t in sgraph.itertransfrags():
             path = sgraph.get_path(t)
-            self.transfrags.append(t)
             self.paths.append(path)
             self.exprs.append(t.expr)
             self.has_source.append(path[0] in start_nodes)
             self.has_sink.append(path[-1] in stop_nodes)
+            self.total_expr += t.expr
+            if len(path) > self.longest_path_length:
+                self.longest_path_length = len(path)
 
     def __str__(self):
         return ('PathGraphFactory %s:%d-%d[%s]' %
                 (self.chrom, self.start, self.end, Strand.to_gtf(self.strand)))
 
-    def longest_path_length(self):
-        longest_path = 0
-        for i in xrange(len(self.paths)):
-            if len(self.paths[i]) > longest_path:
-                longest_path = len(self.paths[i])
-        return longest_path
-
     def create(self, k):
         short_transfrags = []
+        graph_expr = 0.0
         K = PathGraph()
         for i in xrange(len(self.paths)):
             path = self.paths[i]
@@ -102,19 +99,32 @@ class PathGraphFactory(object):
             if self.has_sink[i]:
                 kmers.append(K.SINK)
             K.add_path(kmers, self.exprs[i])
+            # add expression of transfrags that get added to graph
+            graph_expr += self.exprs[i]
 
+        # remove kmers that are unreachable from either the source or the sink
         num_lost_kmers = 0
-        lost_kmer_expr = 0.0
         for i in K.get_unreachable_nodes():
             num_lost_kmers += 1
-            lost_kmer_expr += K.exprs[i]
             K.remove_node_id(i)
 
+        K.k = k
         K.num_lost_kmers = num_lost_kmers
-        K.lost_kmer_expr = lost_kmer_expr
+        K.graph_expr = graph_expr
         K.short_transfrags = short_transfrags
         K.valid = K.is_valid()
         return K
+
+    def get_stats(self, K, kmax=None, lost_short=0, is_opt=0):
+        if kmax is None:
+            kmax = self.longest_path_length
+        expr_frac = 0.0 if self.total_expr == 0 else K.graph_expr / self.total_expr
+        opt = int(round(expr_frac * len(K)))
+        fields = [self.chrom, self.start, self.end, Strand.to_gtf(self.strand),
+                  K.k, kmax, len(self.paths), len(K.short_transfrags),
+                  lost_short, len(K), K.num_lost_kmers, self.total_expr,
+                  K.graph_expr, expr_frac, int(K.valid), opt, is_opt]
+        return fields
 
     def create_optimal(self, kmax=0, stats_fh=None):
         '''
@@ -127,26 +137,21 @@ class PathGraphFactory(object):
 
         # find upper bound to k
         user_kmax = kmax
-        kmax = self.longest_path_length()
+        kmax = self.longest_path_length
         if user_kmax > 0:
-            # user can force a specific kmax (for debugging/testing purposes)
+            # user can force a specific kmax
             kmax = min(user_kmax, kmax)
 
         def compute_kmers(k):
             K = self.create(k)
-            tot_expr = sum(K.exprs[i] for i in K.node_ids_iter())
-            lost_expr = K.lost_kmer_expr
-            lost_expr_frac = 0.0 if tot_expr == 0 else lost_expr / tot_expr
+            expr_frac = 0.0 if self.total_expr == 0 else K.graph_expr / self.total_expr
             if stats_fh:
-                fields = [self.chrom, self.start, self.end,
-                          Strand.to_gtf(self.strand), k, kmax,
-                          len(self.paths), K.n, len(K.short_transfrags),
-                          K.num_lost_kmers, tot_expr, lost_expr,
-                          lost_expr_frac, int(K.valid)]
+                fields = self.get_stats(K, kmax=kmax)
                 print >>stats_fh, '\t'.join(map(str, fields))
             if not K.valid:
                 return -k
             return len(K)
+            #return int(round(expr_frac * len(K)))
 
         k, num_kmers = maximize_bisect(compute_kmers, 1, kmax, 0)
         logging.debug('%s creating path graph k=%d num_kmers=%d' %
@@ -157,6 +162,9 @@ class PathGraphFactory(object):
         num_lost = self.rescue_short_transfrags(K, K.short_transfrags)
         logging.debug('%s lost %d of %d short transfrags' %
                       (str(self), num_lost, len(K.short_transfrags)))
+        if stats_fh:
+            fields = self.get_stats(K, kmax=kmax, lost_short=num_lost, is_opt=1)
+            print >>stats_fh, '\t'.join(map(str, fields))
         return K, k
 
     def rescue_short_transfrags(self, K, indexes):

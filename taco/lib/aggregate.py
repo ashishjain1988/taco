@@ -27,7 +27,7 @@ __status__ = "Development"
 
 
 DNA_COMPLEMENT_DICT = {'A':'T', 'T':'A', 'G':'C', 'C':'G', 'N': 'N'}
-SPLICE_MOTIFS_ALLOWED = {'GTAG', 'GCAG'}
+SPLICE_MOTIFS_ALLOWED = {'GTAG', 'GCAG', 'ATAC'}
 
 
 def dna_reverse_complement(seq):
