@@ -28,15 +28,28 @@ __status__ = "Development"
 
 
 DNA_COMPLEMENT_DICT = {'A':'T', 'T':'A', 'G':'C', 'C':'G', 'N': 'N'}
+SPLICE_MOTIFS_ALLOWED = {'GTAG', 'GCAG'}
 
 def dna_reverse_complement(seq):
     return ''.join(DNA_COMPLEMENT_DICT[x] for x in reversed(seq.upper()))
+
+def is_splice_motif_allowed(genome_fasta_fh, chrom_str, start, end, strand):
+    s = genome_fasta_fh.fetch(chrom_str, start, start + 2)
+    s += genome_fasta_fh.fetch(chrom_str, end - 2, end)
+
+    if (strand == "-"):
+        s = dna_reverse_complement(s)
+
+    if s not in SPLICE_MOTIFS_ALLOWED:
+        return False
+    else:
+        return True
 
 def aggregate_sample(sample, gtf_expr_attr, is_ref, min_length, min_expr,
                      filter_splice_juncs, genome_fasta_fh,
                      bed_file_name, filtered_bed_file_name):
     logging.debug('Aggregate sample %s: %s' % (sample._id, sample.gtf_file))
-    caggregate(sample.gtf_file, str(sample._id), gtf_expr_attr, str(is_ref), bed_file_name, filtered_bed_file_name, float(min_length), float(min_expr), str(filter_splice_juncs))
+    caggregate(sample.gtf_file, str(sample._id), gtf_expr_attr, str(is_ref), bed_file_name, filtered_bed_file_name, float(min_length), float(min_expr), str(filter_splice_juncs), genome_fasta_fh, is_splice_motif_allowed)
 
 def aggregate_worker(input_queue, args, output_dir):
     results = Results(output_dir)
@@ -72,7 +85,6 @@ def aggregate_worker(input_queue, args, output_dir):
     if genome_fasta_fh:
         genome_fasta_fh.close()
 
-    sys.exit(1)
     # sort output files
     logging.debug('Sorting aggregated files: "%s"' % (output_dir))
     # sort bed file
@@ -166,17 +178,6 @@ def aggregate_parallel(samples, args, results):
     if retcode != 0:
         raise TacoError('Error running linux merge')
 
-    logging.debug('\tmerging sample stats')
-    def sort_key_field0(line):
-        fields = line.split('\t', 1)
-        return fields[0]
-    stats_header = ['sample_id', 'num_transfrags', 'filtered_length',
-                    'filtered_expr', 'filtered_splice\n']
-    stats_header = '\t'.join(stats_header)
-    merge_files(input_files=[r.sample_stats_file for r in worker_results],
-                output_file=results.sample_stats_file,
-                key=sort_key_field0,
-                header=stats_header)
     # cleanup worker data
     logging.info('Removing temporary files')
     def shutil_error_callback(func, path, excinfo):

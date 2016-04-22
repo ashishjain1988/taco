@@ -33,7 +33,7 @@ typedef struct Hash_node {
     float expr;
 } Hash_node;
 
-KHASH_MAP_INIT_STR(aggregate_hash, Hash_node*)
+KHASH_MAP_INIT_STR(aggregate_hash, Hash_node*);
 
 bool str_in_hashtable(khash_t(aggregate_hash)* hash_table, const char* str) {
     khint_t potential_bucket_id = kh_get(aggregate_hash, hash_table, str);
@@ -90,7 +90,7 @@ int append_exon_pair_to_bucket(khash_t(aggregate_hash)* hash_table, const char* 
             node->exon_end_array = realloc(node->exon_end_array, node->exon_full_array_length * 2 * sizeof(unsigned long long));
             node->exon_full_array_length *= 2;
         }
-        
+
         if ((node->exon_start_array == NULL) || (node->exon_end_array == NULL)){
             return 1;
         }
@@ -137,8 +137,10 @@ static PyObject* py_caggregate(PyObject* self, PyObject* args) {
     double min_expr;
     char* filter_splice_juncs_string;
     bool filter_splice_juncs;
+    PyObject* genome_fasta_fh;
+    PyObject* function_call_object;
 
-    if (!PyArg_ParseTuple(args, "ssssssdds", &gtf_file, &sample_id, &gtf_expr_attr, &is_ref, &bed_filename, &filtered_bed_filename, &min_length, &min_expr, &filter_splice_juncs_string)) {
+    if (!PyArg_ParseTuple(args, "ssssssddsOO", &gtf_file, &sample_id, &gtf_expr_attr, &is_ref, &bed_filename, &filtered_bed_filename, &min_length, &min_expr, &filter_splice_juncs_string, &genome_fasta_fh, &function_call_object)) {
         return NULL;
     }
 
@@ -176,7 +178,7 @@ static PyObject* py_caggregate(PyObject* self, PyObject* args) {
     double total_expr = 0.0;
 
     while (getline(&buffer, &bufflen, gtf_file_handler) != -1) {
-        char* saveptr = NULL; 
+        char* saveptr = NULL;
         const char* seqname = strtok_r(buffer, "\t", &saveptr);
         const char* source = strtok_r(NULL, "\t", &saveptr);
         const char* feature = strtok_r(NULL, "\t", &saveptr);
@@ -272,7 +274,23 @@ static PyObject* py_caggregate(PyObject* self, PyObject* args) {
 
         if (filter_splice_juncs) {
             // Remove transfrags with non-canonical splice motifs
-            // TODO
+            if (node->exon_array_length > 1) {
+                for (unsigned long long i = 0; i < node->exon_array_length - 1; i++) {
+                    PyObject* chrom = Py_BuildValue("s", node->chrom);
+                    PyObject* start = Py_BuildValue("K", node->exon_end_array[i]);
+                    PyObject* end = Py_BuildValue("K", node->exon_start_array[i+1]);
+                    PyObject* strand = Py_BuildValue("c", node->strand);
+
+                    PyObject* return_obj = PyObject_CallFunctionObjArgs(function_call_object, genome_fasta_fh, chrom, start, end, strand, NULL);
+                    bool return_val;
+                    PyArg_Parse(return_obj,"b", &return_val);
+
+                    if (return_val == false) {
+                        keep = false;
+                        nsplice += 1;
+                    }
+                }
+            }
         }
 
         FILE* output_file;
