@@ -54,8 +54,6 @@ class Args:
     @staticmethod
     def create():
         parser = argparse.ArgumentParser(description=Args.DESCRIPTION)
-        rungrp = parser.add_argument_group('Run Options',
-                                           '(TACO modes)')
         advgrp = parser.add_argument_group('Advanced Options',
                                            '(recommend leaving at their '
                                            'default settings for most '
@@ -63,30 +61,30 @@ class Args:
         # guidedgrp = parser.add_argument_group('Guided-Assembly Options',
         #                                       '(DO NOT USE: under '
         #                                       'development)')
-        rungrp.add_argument("-o", "--output-dir", dest="output_dir",
+        parser.add_argument("-o", "--output-dir", dest="output_dir",
                             metavar='DIR',
                             default=Args.OUTPUT_DIR,
                             help='directory where output files will be '
                             'stored (if already exists then --resume must '
                             'be specified) [default=%(default)s]')
-        rungrp.add_argument('-v', '--verbose', dest='verbose',
-                            action="store_true",
-                            default=Args.VERBOSE,
-                            help='Enabled detailed logging '
-                            '(for debugging)')
-        rungrp.add_argument('-p', '--num-processes', type=int,
+        parser.add_argument('-p', '--num-processes', type=int,
                             metavar='N',
                             dest='num_processes',
                             default=Args.NUM_PROCESSES,
                             help='Run TACO in parallel with N '
                             'processes [default=%(default)s]')
-        rungrp.add_argument('--resume', dest='resume',
+        parser.add_argument('-v', '--verbose', dest='verbose',
+                            action="store_true",
+                            default=Args.VERBOSE,
+                            help='Enabled detailed logging '
+                            '(for debugging)')
+        parser.add_argument('--resume', dest='resume',
                             action='store_true',
                             default=Args.RESUME,
                             help='Resumes an existing run that may have '
                             'ended prematurely. Specify the location of the '
                             'run using the -o/--output-dir option.')
-        rungrp.add_argument('--assemble',
+        parser.add_argument('--assemble',
                             dest='assemble',
                             metavar='BED',
                             default=Args.ASSEMBLE,
@@ -297,7 +295,7 @@ class Args:
                 args.assemble = os.path.abspath(args.assemble)
 
             if args.sample_file is None:
-                parser.error('Sample file not specified')
+                parser.error('Sample file not specified. Run with --help for more info.')
             if not os.path.exists(args.sample_file):
                 parser.error('Sample file %s not found' % (args.sample_file))
             args.sample_file = os.path.abspath(args.sample_file)
