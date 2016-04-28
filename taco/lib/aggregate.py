@@ -42,6 +42,12 @@ def parse_gtf(gtf_iter, sample_id, gtf_expr_attr, is_ref):
     total_expr = 0.0
     cur_t_id = 1
     for gtf_line in gtf_iter:
+        if not gtf_line:
+            continue
+        if not gtf_line.strip():
+            continue
+        if gtf_line.startswith("#"):
+            continue
         f = GTF.Feature.from_str(gtf_line)
         if f.feature == 'transcript':
             t_id = f.attrs[GTF.Attr.TRANSCRIPT_ID]
