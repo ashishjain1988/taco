@@ -47,7 +47,7 @@ class Args:
     GUIDED_ENDS = False
     RESUME = False
     ASSEMBLE = None
-    OUTPUT_DIR = 'taco'
+    OUTPUT_DIR = 'output'
     PROG = 'taco'
     DESCRIPTION = 'TACO: Multi-sample transcriptome assembly from RNA-Seq'
 
