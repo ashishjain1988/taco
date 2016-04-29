@@ -1,19 +1,15 @@
 '''
 TACO: Multi-sample transcriptome assembly from RNA-Seq
-Copyright (C) 2012-2015 Matthew Iyer
-
-@author: mkiyer
-@author: yniknafs
 '''
 import collections
 import logging
 import os
 
-__author__ = "Matthew Iyer and Yashar Niknafs"
-__copyright__ = "Copyright 2015"
-__credits__ = ["Matthew Iyer", "Yashar Niknafs"]
+__author__ = "Matthew Iyer, Yashar Niknafs, and Balaji Pandian"
+__copyright__ = "Copyright 2012-2016"
+__credits__ = ["Matthew Iyer", "Yashar Niknafs", "Balaji Pandian"]
 __license__ = "GPL"
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
