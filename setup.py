@@ -1,8 +1,8 @@
 '''
 TACO: Multi-sample transcriptome assembly from RNA-Seq
 '''
-from distutils.core import setup
-from distutils.extension import Extension
+from setuptools import setup
+from setuptools import Extension
 from Cython.Build import cythonize
 
 import numpy
