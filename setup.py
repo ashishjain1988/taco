@@ -74,7 +74,6 @@ def main():
     datadir = os.path.join('share', 'data')
     datafiles = [(d, [os.path.join(d,f) for f in files])
         for d, folders, files in os.walk(datadir)]
-    print datafiles
     setup(name='taco',
           version=__version__,
           description='transcriptome meta-assembly for rna-seq',
