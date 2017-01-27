@@ -1,6 +1,7 @@
 '''
 TACO: Multi-sample transcriptome assembly from RNA-Seq
 '''
+import os
 from setuptools import setup
 from setuptools import Extension
 from Cython.Build import cythonize
@@ -70,6 +71,10 @@ extensions = [
 
 
 def main():
+    datadir = os.path.join('share', 'data')
+    datafiles = [(d, [os.path.join(d,f) for f in files])
+        for d, folders, files in os.walk(datadir)]
+
     setup(name='taco',
           version=__version__,
           description='transcriptome meta-assembly for rna-seq',
@@ -82,7 +87,8 @@ def main():
           ext_modules=extensions + cythonize(cython_extensions),
           packages=['taco', 'taco.lib', 'taco.lib.bx', 'taco.lib.scipy',
                     'taco.lib.pysam'],
-          scripts=['taco/taco_run.py'])
+          scripts=['taco/taco_run.py'],
+          data_files = datafiles)
 
 
 if __name__ == '__main__':
