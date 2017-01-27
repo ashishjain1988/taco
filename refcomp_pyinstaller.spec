@@ -6,7 +6,7 @@ added_files = [
          ( 'share', 'share' )
          ]
 
-a = Analysis(['taco/utils/refcomp/taco_refcomp.py'],
+a = Analysis(['taco_refcomp.py'],
              pathex=['.'],
              binaries=None,
              datas=added_files,

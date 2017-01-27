@@ -74,7 +74,7 @@ def main():
     datadir = os.path.join('share', 'data')
     datafiles = [(d, [os.path.join(d,f) for f in files])
         for d, folders, files in os.walk(datadir)]
-
+    print datafiles
     setup(name='taco',
           version=__version__,
           description='transcriptome meta-assembly for rna-seq',
@@ -87,7 +87,7 @@ def main():
           ext_modules=extensions + cythonize(cython_extensions),
           packages=['taco', 'taco.lib', 'taco.lib.bx', 'taco.lib.scipy',
                     'taco.lib.pysam'],
-          scripts=['taco/taco_run.py'],
+          scripts=['taco/taco_run.py', 'taco/taco_refcomp.py'],
           data_files = datafiles)
 
 

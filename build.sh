@@ -7,7 +7,9 @@ fi
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 START_DIR=$PWD
 python setup.py build
-pyinstaller $DIR/refcomp_pyinstaller.spec
-pyinstaller --onefile -n taco $DIR/taco/taco_run.py
-mv $DIR/dist/taco "$START_DIR""/taco_run"
+cp -r share build/lib*/taco
+cp build/lib*/taco/taco_refcomp.py .
+pyinstaller refcomp_pyinstaller.spec
+pyinstaller --onefile build/lib*/taco/taco_run.py
+mv $DIR/dist/taco_run "$START_DIR""/taco_run"
 mv $DIR/dist/taco_refcomp "$START_DIR""/taco_refcomp"
