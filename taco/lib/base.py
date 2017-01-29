@@ -15,6 +15,74 @@ __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
 
 
+# assemblyline GTF attributes
+class GTFAttr:
+    GENE_ID = 'gene_id'
+    TRANSCRIPT_ID = 'transcript_id'
+    SAMPLE_ID = 'sid'
+    LIBRARY_ID = 'lid'
+    REF = 'ref'
+    TEST = 'tst'
+    PCTRANK = 'pct'
+    CATEGORY = 'cat'
+    ANN_REF_ID = 'aid'
+    ANN_COV_RATIO = 'acr'
+    ANN_INTRON_RATIO = 'air'
+    SCORE = 'score'
+    MEAN_SCORE = 'avgscore'
+    MEAN_PCTRANK = 'avgpct'
+    MEAN_RECURRENCE = 'avgrecur'
+    RESOLVED_STRAND = 'resolvedstrand'
+    LOG10LR = 'log10lr'
+
+class Category(object):
+    # constant transcript category values
+    SAME_STRAND = 0
+    OPP_STRAND = 1
+    INTRONIC_SAME_STRAND = 2
+    INTRONIC_OPP_STRAND = 3
+    INTRONIC_AMBIGUOUS = 4
+    INTERLEAVING = 5
+    INTERGENIC = 6
+    NUM_CATEGORIES = 7
+    CATEGORIES = range(0, NUM_CATEGORIES)
+
+    # used when comparing assemblies
+    INTERLEAVING_SAME_STRAND = 8
+    INTERLEAVING_OPP_STRAND = 9
+    ENCOMPASSING_SAME_STRAND = 10
+    ENCOMPASSING_OPP_STRAND = 11
+    # used when a gene overlaps multiple independent genes in the SAME_STRAND category
+    READ_THROUGH = 12
+
+    # groups of categories
+    INTRONIC_LIKE = set([INTRONIC_SAME_STRAND, INTRONIC_AMBIGUOUS])
+    INTERGENIC_LIKE = set([OPP_STRAND, INTRONIC_OPP_STRAND, INTERLEAVING,
+                           INTERGENIC])
+
+    INT_TO_STR_DICT = {SAME_STRAND: 'same_strand',
+                       OPP_STRAND: 'opp_strand',
+                       INTRONIC_SAME_STRAND: 'intronic_same_strand',
+                       INTRONIC_OPP_STRAND: 'intronic_opp_strand',
+                       INTRONIC_AMBIGUOUS: 'intronic_ambiguous',
+                       INTERLEAVING: 'interleaving',
+                       INTERGENIC: 'intergenic',
+                       INTERLEAVING_SAME_STRAND: 'interleaving_same_strand',
+                       INTERLEAVING_OPP_STRAND: 'interleaving_opp_strand',
+                       ENCOMPASSING_SAME_STRAND: 'encompassing_same_strand',
+                       ENCOMPASSING_OPP_STRAND: 'encompassing_opp_strand',
+                       READ_THROUGH: 'read_through'}
+
+    STR_TO_INT_DICT = dict((v,k) for k,v in INT_TO_STR_DICT.items())
+
+    @staticmethod
+    def to_str(catint):
+        return Category.INT_TO_STR_DICT[catint]
+    @staticmethod
+    def to_int(catstr):
+        return Category.STR_TO_INT_DICT[catstr]
+
+
 class TacoError(Exception):
     pass
 
