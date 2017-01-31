@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 import collections
 import bisect
+import os
 from gtf_comp import parse_loci, GTFFeature, GTFError
 
 # attributes
@@ -180,15 +181,15 @@ class Transcript(object):
             features.append(f)
         return features
 
-def transcripts_from_gtf_lines(lines, attr_defs=None):
+def transcripts_from_gtf_lines(lines, attr_defs=None, log=None):
     transcripts = collections.OrderedDict()
     for line in lines:
-        feature = GTFFeature.from_string(line, attr_defs)
+        feature = GTFFeature.from_string(line, attr_defs, log)
         if feature.feature_type == 'gene':
             continue
         t_id = feature.attrs["transcript_id"]
-
-        if t_id not in transcripts:
+        ref = feature.attrs["ref"]
+        if (t_id, ref) not in transcripts.keys():
             if feature.feature_type != "transcript":
                 raise GTFError("Feature type '%s' found before 'transcript' record: %s" %
                                (feature.feature_type, str(feature)))
@@ -201,19 +202,20 @@ def transcripts_from_gtf_lines(lines, attr_defs=None):
             t.strand = strand_str_to_int(feature.strand)
             t.exons = []
             t.attrs = feature.attrs
-            transcripts[t_id] = t
+            transcripts[(t_id, ref)] = t
         else:
-            t = transcripts[t_id]
+            t = transcripts[(t_id, ref)]
         if feature.feature_type == "exon":
             t.exons.append(Exon(feature.start, feature.end))
     # sort transcript exons by genomic position
     for t in transcripts.itervalues():
         t.exons.sort()
+        t.end = t.exons[-1].end
     return transcripts.values()
 
 def parse_gtf(fileh, attr_defs=None):
     for locus_features in parse_loci(fileh):
-        yield transcripts_from_gtf_lines(locus_features, attr_defs)
+        yield transcripts_from_gtf_lines(locus_features, attr_defs, fileh.name)
 
 def genes_from_gtf_lines(lines, attr_defs=None):
     transcripts = collections.OrderedDict()

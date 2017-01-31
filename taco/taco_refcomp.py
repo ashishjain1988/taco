@@ -563,6 +563,7 @@ def compare_locus(transcripts):
     boundaries = find_exon_boundaries(transcripts)
     test_transcripts = []
     for t in transcripts:
+        # print 'is_ref', t.attrs[GTFAttr.REF]
         # separate ref and nonref transcripts
         is_ref = bool(int(t.attrs[GTFAttr.REF]))
         if is_ref:
@@ -584,6 +585,7 @@ def compare_locus(transcripts):
                 ref_splicing_patterns[tuple(splicing_pattern)].append(t)
         else:
             test_transcripts.append(t)
+    # print test_transcripts
     # index introns for fast intersection
     intron_tree = IntervalTree()
     for intron, refs in ref_intron_dict.iteritems():
