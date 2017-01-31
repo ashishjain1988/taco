@@ -54,4 +54,6 @@ if __name__ == '__main__':
         import cProfile
         sys.exit(cProfile.run('main()', filename=PROFILE_FILENAME))
     else:
-        sys.exit(main())
+        return_value = main()
+        if (return_value != 0):
+            sys.exit(return_value)
