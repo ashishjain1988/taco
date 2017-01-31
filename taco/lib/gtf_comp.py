@@ -50,6 +50,7 @@ def merge_sort_gtf_files(gtf_files, output_file, tmp_dir=None):
     os.remove(tmp_file)
 
 def parse_loci(line_iter):
+
     '''
     requires that GTF file has been sorted and formatted such that a
     single 'transcript' feature appears before individual 'exon'
