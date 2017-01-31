@@ -50,6 +50,7 @@ def merge_sort_gtf_files(gtf_files, output_file, tmp_dir=None):
     os.remove(tmp_file)
 
 def parse_loci(line_iter):
+
     '''
     requires that GTF file has been sorted and formatted such that a
     single 'transcript' feature appears before individual 'exon'
@@ -132,7 +133,7 @@ class GTFFeature(object):
         return '\t'.join(line)
 
     @staticmethod
-    def from_string(line, attr_defs=None):
+    def from_string(line, attr_defs=None, log=None):
         f = GTFFeature()
         # read the GTF line
         fields = line.strip().split('\t')
@@ -160,7 +161,6 @@ class GTFFeature(object):
                 tag, value = a.split(GTF_ATTR_TAGVALUE_SEP, 1)
                 # remove quotes
                 value = value.strip('"')
-                #value = value.split('"')[1]
                 # apply parsing function
                 if (attr_defs != None) and (tag in attr_defs) and (attr_defs[tag] != None):
                     value = attr_defs[tag](value)

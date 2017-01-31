@@ -28,6 +28,7 @@ GENCODE_CATEGORY_MAP = {'IG_C_gene': 'protein_coding',
                      'IG_D_gene': 'protein_coding',
                      'IG_J_gene': 'protein_coding',
                      'IG_V_gene': 'protein_coding',
+                     'IG_LV_gene': 'protein_coding',
                      'TR_C_gene': 'protein_coding',
                      'TR_J_gene': 'protein_coding',
                      'TR_V_gene': 'protein_coding',
@@ -55,8 +56,10 @@ GENCODE_CATEGORY_MAP = {'IG_C_gene': 'protein_coding',
                      'ribozyme' : 'lncRNA',
                      'macro_lncRNA': 'lncRNA',
                      'non_coding': 'lncRNA',
+                     'bidirectional_promoter_lncRNA': 'lncRNA',
                      'scaRNA': 'ncRNA',
                      'sRNA': 'ncRNA',
+                     'IG_pseudogene': 'pseudogene',
                      'IG_C_pseudogene': 'pseudogene',
                      'IG_J_pseudogene': 'pseudogene',
                      'IG_V_pseudogene': 'pseudogene',
@@ -81,6 +84,19 @@ GENCODE_CATEGORY_MAP = {'IG_C_gene': 'protein_coding',
                      'translated_unprocessed_pseudogene': 'pseudogene',
                      'unprocessed_pseudogene': 'pseudogene'}
 
+
+def gencode_category_map(x):
+    if 'ncrna' in x.lower():
+        out = 'ncRNA'
+    elif 'lncrna' in x.lower():
+        out = 'lncRNA'
+    else:
+        out = GENCODE_CATEGORY_MAP.get(x, 'other')
+    return out
+
+
+
+
 # attributes to include in TSV that is generated at the end
 FULL_GTF_ATTRS = ['gene_id',
                   'tss_id',
@@ -99,6 +115,11 @@ FULL_GTF_ATTRS = ['gene_id',
                   'shared_opp_strand_bp',
                   'shared_introns',
                   'shared_splicing']
+
+def wc(infile):
+    p = subprocess.Popen('wc -l %s' % infile, shell=True, stdout=subprocess.PIPE)
+    out, err = p.communicate()
+    return int(out.split()[0])
 
 # class + function to get metadata TSV from gtf
 class TranscriptMetadata(object):
@@ -547,6 +568,7 @@ def compare_locus(transcripts):
     boundaries = find_exon_boundaries(transcripts)
     test_transcripts = []
     for t in transcripts:
+        # print 'is_ref', t.attrs[GTFAttr.REF]
         # separate ref and nonref transcripts
         is_ref = bool(int(t.attrs[GTFAttr.REF]))
         if is_ref:
@@ -568,6 +590,7 @@ def compare_locus(transcripts):
                 ref_splicing_patterns[tuple(splicing_pattern)].append(t)
         else:
             test_transcripts.append(t)
+    # print test_transcripts
     # index introns for fast intersection
     intron_tree = IntervalTree()
     for intron, refs in ref_intron_dict.iteritems():
@@ -962,41 +985,46 @@ def compare_assemblies_worker(input_queue):
             gtf_fileh = open(intergenic_gtf_file, 'w')
             # intergenic_fileh = open(intergenic_file, 'w')
             intergenic_best_fileh = open(intergenic_best_file, 'w')
-            for locus_transcripts in parse_gtf(open(intergenic_tmp_gtf_file)):
-                for t in locus_transcripts:
-                    # find nearest transcripts
-                    nearest_transcripts = find_nearest_transcripts(t.chrom, t.start, t.end, t.strand, locus_trees)
-                    match_stats = []
-                    best_match = None
-                    if len(nearest_transcripts) == 0:
-                        best_match = MatchStats.from_transcript(t)
-                        best_match.category = Category.to_str(Category.INTERGENIC)
-                        match_stats.append(best_match)
-                    else:
-                        for ref,category,dist in nearest_transcripts:
-                            # create a match object
-                            ms = MatchStats.from_transcript(t, ref)
-                            ms.shared_same_strand_bp = 0
-                            ms.shared_opp_strand_bp = 0
-                            ms.shared_introns = 0
-                            ms.shared_splicing = False
-                            ms.category = Category.to_str(category)
-                            ms.distance = dist
-                            match_stats.append(ms)
-                        # choose the consensus match
-                        best_match = MatchStats.choose_best(match_stats)
-                    # add gtf attributes and write
-                    for f in t.to_gtf_features(source='assembly'):
-                        # best_match.add_gtf_attributes(f)
-                        print >>gtf_fileh, str(f)
-                    # write tab-delimited data
-                    # print >>intergenic_best_fileh, str(best_match)
-                    # for ms in match_stats:
-                        # print >>intergenic_fileh, str(ms)
-            gtf_fileh.close()
-            # intergenic_fileh.close()
-            intergenic_best_fileh.close()
-            open(intergenic_done_file, 'w').close()
+            def wc(infile):
+                p = subprocess.Popen('wc -l %s' % infile, shell=True, stdout=subprocess.PIPE)
+                out, err = p.communicate()
+                return int(out.split()[0])
+            if wc(intergenic_tmp_gtf_file) != 0:
+                for locus_transcripts in parse_gtf(open(intergenic_tmp_gtf_file)):
+                    for t in locus_transcripts:
+                        # find nearest transcripts
+                        nearest_transcripts = find_nearest_transcripts(t.chrom, t.start, t.end, t.strand, locus_trees)
+                        match_stats = []
+                        best_match = None
+                        if len(nearest_transcripts) == 0:
+                            best_match = MatchStats.from_transcript(t)
+                            best_match.category = Category.to_str(Category.INTERGENIC)
+                            match_stats.append(best_match)
+                        else:
+                            for ref,category,dist in nearest_transcripts:
+                                # create a match object
+                                ms = MatchStats.from_transcript(t, ref)
+                                ms.shared_same_strand_bp = 0
+                                ms.shared_opp_strand_bp = 0
+                                ms.shared_introns = 0
+                                ms.shared_splicing = False
+                                ms.category = Category.to_str(category)
+                                ms.distance = dist
+                                match_stats.append(ms)
+                            # choose the consensus match
+                            best_match = MatchStats.choose_best(match_stats)
+                        # add gtf attributes and write
+                        for f in t.to_gtf_features(source='assembly'):
+                            # best_match.add_gtf_attributes(f)
+                            print >>gtf_fileh, str(f)
+                        # write tab-delimited data
+                        # print >>intergenic_best_fileh, str(best_match)
+                        # for ms in match_stats:
+                            # print >>intergenic_fileh, str(ms)
+                gtf_fileh.close()
+                # intergenic_fileh.close()
+                intergenic_best_fileh.close()
+                open(intergenic_done_file, 'w').close()
         # merge overlapping and intergenic results
         metadata_file = os.path.join(output_dir, 'metadata.txt')
         metadata_consensus_file = os.path.join(output_dir, 'metadata.consensus.txt')
@@ -1075,6 +1103,11 @@ def compare_assemblies(ref_gtf_file, test_gtf_file, output_dir, output_final, cp
                 for line in inputfh:
                     outfh.write(line)
 
+
+    if wc(assembly_gtf_file) == 0:
+        logging.error('Zero overlap for reference and test GTFs. '
+        'Ensure they are from the same species / genome.')
+        sys.exit()
 
 
     # read compared assembly and add annotation status / final category
@@ -1155,7 +1188,7 @@ def compare_assemblies(ref_gtf_file, test_gtf_file, output_dir, output_final, cp
                         ref_gene_types = set(ref_gene_type.split(','))
                         transcript_types = set(impute_transcript_type(catint, length, gene_type, x) for x in ref_gene_types)
                         t.attrs['ref_gene_type'] = ','.join(transcript_types)
-                        transcript_categories = set(GENCODE_CATEGORY_MAP[x] for x in transcript_types)
+                        transcript_categories = set(gencode_category_map(x) for x in transcript_types)
                         # sorted and join unique types/categories to make conglomerated category assignments
                         transcript_type = ','.join(sorted(transcript_types))
                         transcript_category = ','.join(sorted(transcript_categories))

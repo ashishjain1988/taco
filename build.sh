@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+set -o pipefail
 
 if !(command -v pyinstaller >/dev/null;) then
 	echo \'pyinstaller\' is not installed on this machine. Exiting.
