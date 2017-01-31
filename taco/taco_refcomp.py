@@ -116,6 +116,11 @@ FULL_GTF_ATTRS = ['gene_id',
                   'shared_introns',
                   'shared_splicing']
 
+def wc(infile):
+    p = subprocess.Popen('wc -l %s' % infile, shell=True, stdout=subprocess.PIPE)
+    out, err = p.communicate()
+    return int(out.split()[0])
+
 # class + function to get metadata TSV from gtf
 class TranscriptMetadata(object):
     def __init__(self, gtf_attrs=None):
@@ -1098,6 +1103,11 @@ def compare_assemblies(ref_gtf_file, test_gtf_file, output_dir, output_final, cp
                 for line in inputfh:
                     outfh.write(line)
 
+
+    if wc(assembly_gtf_file) == 0:
+        logging.error('Zero overlap for reference and test GTFs. '
+        'Ensure they are from the same species / genome.')
+        sys.exit()
 
 
     # read compared assembly and add annotation status / final category
