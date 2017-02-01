@@ -8,10 +8,10 @@ from base import Exon, Strand, Sample
 from gtf import GTF, GTFError
 
 __author__ = "Matthew Iyer, Yashar Niknafs, and Balaji Pandian"
-__copyright__ = "Copyright 2012-2016"
+__copyright__ = "Copyright 2012-2017"
 __credits__ = ["Matthew Iyer", "Yashar Niknafs", "Balaji Pandian"]
 __license__ = "GPL"
-__version__ = "0.5.0"
+__version__ = "0.6.2"
 __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
