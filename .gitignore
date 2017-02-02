@@ -23,3 +23,7 @@ taco/lib/scipy/norm_sf.c
 taco/lib/pysam/cfaidx.c
 build
 taco_run.spec
+taco/lib/cbedgraph.c
+taco_compare
+taco_refcomp
+taco_run

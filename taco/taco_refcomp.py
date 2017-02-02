@@ -1119,7 +1119,10 @@ def compare_assemblies(ref_gtf_file, test_gtf_file, output_dir, output_final, cp
         with open(assembly_bed_cpat_file, 'w') as f:
             for transcripts in parse_gtf(open(assembly_gtf_file)):
                 for t in transcripts:
-                    name = '%s|%s' % (t.attrs['gene_id'], t.attrs['transcript_id'])
+                    if 'gene_id' in t.attrs.keys():
+                        name = '%s|%s' % (t.attrs['gene_id'], t.attrs['transcript_id'])
+                    else:
+                        name = t.attrs['transcript_id']
                     fields = write_bed(t.chrom, name, t.strand, 1000, t.exons)
                     print >>f, '\t'.join(fields)
 
@@ -1295,7 +1298,7 @@ def main():
                         '(WARNING: The CPAT tool can take over an hour) ')
     parser.add_argument("--cpat-species", dest='cpat_spec', default='human',
                         help='Select either: human, mouse, zebrafish')
-    parser.add_argument("--cpat-genome", dest='cpat_gen', default='human',
+    parser.add_argument("--cpat-genome", dest='cpat_gen',
                         help='Provide a genome fasta for the genome used to '
                         'produce assemblies being compared. Required '
                         'if \"--cpat\" used. CPAT uses this '
@@ -1320,6 +1323,10 @@ def main():
         logging.error('Please provide both reference and test GTF files')
         return 1
 
+    if args.cpat:
+        if not args.cpat_gen:
+            logging.error('A genome FASTA must be provided (with "--cpat-genome" flag) when using "--cpat" flag')
+            return 1
 
     logging.basicConfig(level=level,
                         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
