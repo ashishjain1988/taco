@@ -1291,18 +1291,18 @@ def main():
     parser.add_argument("-p", "--num-processes", type=int, default=1,
                         dest="num_cores", help='Run tool in parallel with N processes. '
                         '(note: each core processes 1 chromosome) ')
-    parser.add_argument("--cpat", action='store_true', default=False,
-                        help='Run CPAT tool to for coding potential scoring. '
-                        '(CPAT function currently only supports '
-                        'Human, Mouse, and Zebrafish) '
-                        '(WARNING: The CPAT tool can take over an hour) ')
-    parser.add_argument("--cpat-species", dest='cpat_spec', default='human',
-                        help='Select either: human, mouse, zebrafish')
-    parser.add_argument("--cpat-genome", dest='cpat_gen',
-                        help='Provide a genome fasta for the genome used to '
-                        'produce assemblies being compared. Required '
-                        'if \"--cpat\" used. CPAT uses this '
-                        'to obtain sequence for the provided transcripts')
+    # parser.add_argument("--cpat", action='store_true', default=False,
+    #                     help='Run CPAT tool to for coding potential scoring. '
+    #                     '(CPAT function currently only supports '
+    #                     'Human, Mouse, and Zebrafish) '
+    #                     '(WARNING: The CPAT tool can take over an hour) ')
+    # parser.add_argument("--cpat-species", dest='cpat_spec', default='human',
+    #                     help='Select either: human, mouse, zebrafish')
+    # parser.add_argument("--cpat-genome", dest='cpat_gen',
+    #                     help='Provide a genome fasta for the genome used to '
+    #                     'produce assemblies being compared. Required '
+    #                     'if \"--cpat\" used. CPAT uses this '
+    #                     'to obtain sequence for the provided transcripts')
     parser.add_argument("-r", "--ref-gtf", dest='ref_gtf_file',
                         help='Reference GTF file to compare against')
     parser.add_argument("-t", "--test-gtf", dest='test_gtf_file',
