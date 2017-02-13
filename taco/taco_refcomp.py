@@ -1316,17 +1316,17 @@ def main():
 
 
     #establish CPAT associated files
-    cpat_dict = cpat_init(args.cpat, args.cpat_gen, args.cpat_spec)
+    cpat_dict = {}
 
 
     if not args.ref_gtf_file or not args.test_gtf_file:
         logging.error('Please provide both reference and test GTF files')
         return 1
 
-    if args.cpat:
-        if not args.cpat_gen:
-            logging.error('A genome FASTA must be provided (with "--cpat-genome" flag) when using "--cpat" flag')
-            return 1
+    # if args.cpat:
+    #     if not args.cpat_gen:
+    #         logging.error('A genome FASTA must be provided (with "--cpat-genome" flag) when using "--cpat" flag')
+    #         return 1
 
     logging.basicConfig(level=level,
                         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -1340,7 +1340,7 @@ def main():
     logging.info("reference gtf file:    %s" % (args.ref_gtf_file))
     logging.info("test gtf file:         %s" % (args.test_gtf_file))
     logging.info("output directory:      %s" % (args.output_dir))
-    logging.info("run cpat:              %s" % (args.cpat))
+    # logging.info("run cpat:              %s" % (args.cpat))
     logging.info("----------------------------------")
 
     # check command line parameters
