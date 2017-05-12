@@ -107,8 +107,8 @@ class Args:
                             dest='filter_min_expr',
                             type=float, metavar='X',
                             default=Args.FILTER_MIN_EXPR,
-                            help='Filter input transfrags with transcripts '
-                            'per milliion (TPM) < X prior to assembly '
+                            help='Filter input transfrags with expression '
+                            '(FPKM/TPM) < X prior to assembly '
                             '[default=%(default)s]')
         parser.add_argument('--filter-splice-juncs',
                             dest='filter_splice_juncs',
