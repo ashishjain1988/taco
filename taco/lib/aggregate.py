@@ -26,7 +26,6 @@ __status__ = "Development"
 
 
 DNA_COMPLEMENT_DICT = {'A':'T', 'T':'A', 'G':'C', 'C':'G', 'N': 'N'}
-SPLICE_MOTIFS_ALLOWED = {'GTAG', 'GCAG', 'ATAC'}
 
 
 def dna_reverse_complement(seq):
@@ -85,9 +84,10 @@ def parse_gtf(gtf_iter, sample_id, gtf_expr_attr, is_ref):
 
 
 def aggregate_sample(sample, gtf_expr_attr, is_ref, min_length, min_expr,
-                     filter_splice_juncs, genome_fasta_fh,
+                     filter_splice_juncs, add_splice_motif, genome_fasta_fh,
                      bed_fh, filtered_bed_fh, stats_fh):
     logging.debug('Aggregate sample %s: %s' % (sample._id, sample.gtf_file))
+
     # read all transcripts
     with open(sample.gtf_file) as fh:
         transcripts, total_expr = parse_gtf(fh, sample._id, gtf_expr_attr, is_ref)
@@ -110,6 +110,9 @@ def aggregate_sample(sample, gtf_expr_attr, is_ref, min_length, min_expr,
             keep = False
             nexpr += 1
         if filter_splice_juncs:
+            SPLICE_MOTIFS_ALLOWED = {'GTAG', 'GCAG', 'ATAC'}
+            for motif in add_splice_motif:
+                SPLICE_MOTIFS_ALLOWED.add(motif.upper())
             # remove transfrags with non-canonical splice motifs
             for start, end in t.iterintrons():
                 s = genome_fasta_fh.fetch(t.chrom, start, start + 2)
@@ -158,6 +161,7 @@ def aggregate_worker(input_queue, args, output_dir):
                          min_length=args.filter_min_length,
                          min_expr=args.filter_min_expr,
                          filter_splice_juncs=args.filter_splice_juncs,
+                         add_splice_motif=args.add_splice_motif,
                          genome_fasta_fh=genome_fasta_fh,
                          bed_fh=bed_fh,
                          filtered_bed_fh=filtered_bed_fh,
