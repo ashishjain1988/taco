@@ -29,6 +29,7 @@ class Args:
     NUM_PROCESSES = 1
     GTF_EXPR_ATTR = 'FPKM'
     FILTER_SPLICE_JUNCS = False
+    ADD_SPLICE_MOTIF = []
     FILTER_MIN_LENGTH = 200
     FILTER_MIN_EXPR = 0.5
     ISOFORM_FRAC = 0.05
@@ -107,8 +108,8 @@ class Args:
                             dest='filter_min_expr',
                             type=float, metavar='X',
                             default=Args.FILTER_MIN_EXPR,
-                            help='Filter input transfrags with transcripts '
-                            'per milliion (TPM) < X prior to assembly '
+                            help='Filter input transfrags with expression '
+                            '(FPKM/TPM) < X prior to assembly '
                             '[default=%(default)s]')
         parser.add_argument('--filter-splice-juncs',
                             dest='filter_splice_juncs',
@@ -116,9 +117,17 @@ class Args:
                             default=Args.FILTER_SPLICE_JUNCS,
                             help='Filter input transfrags that possess '
                             'non-canonical splice motifs prior to assembly. '
-                            'Splice motifs are GTAG and GCAG are allowed '
+                            'Splice motifs are GTAG, GCAG, and ATAC are allowed '
                             '[default=%(default)s]. Requires genome sequence '
                             'to be specified using --ref-genome-fasta.')
+        parser.add_argument('--add-splice-motif',
+                            dest='add_splice_motif',
+                            action='append',
+                            default=Args.ADD_SPLICE_MOTIF,
+                            help='Add additional splice junction motifs to '
+                            'permit when using the --filter-splice-juncs flag. '
+                            'Use this flag multiple times for each additional '
+                            'junction motif. Motif must be 4 bases.')
         parser.add_argument('--ref-genome-fasta',
                             dest='ref_genome_fasta_file',
                             default=None,
@@ -247,6 +256,8 @@ class Args:
         func(fmt.format('filter min length:', args.filter_min_length))
         func(fmt.format('filter min expression:', args.filter_min_expr))
         func(fmt.format('filter splice juncs:', args.filter_splice_juncs))
+        func(fmt.format('additional splice motifs:',
+                        str(','.join(args.add_splice_motif))))
         func(fmt.format('reference genome FASTA file:',
                         args.ref_genome_fasta_file))
         func(fmt.format('reference GTF file:', str(args.ref_gtf_file)))
@@ -329,6 +340,15 @@ class Args:
                 if not os.path.exists(args.ref_genome_fasta_file):
                     parser.error('Reference genome FASTA file not found')
                 args.ref_genome_fasta_file = os.path.abspath(args.ref_genome_fasta_file)
+
+            if args.add_splice_motif != []:
+                for motif in args.add_splice_motif:
+                    if len(motif) != 4:
+                        parser.error('Only motifs of lenght 4 allowed.')
+                    if not args.filter_splice_juncs:
+                        parser.error('Additional permissible splice motifs '
+                        'provided (--add-splice-motif), but splice junction '
+                        'filter not enabled (--filter-splice-juncs)')
 
             if args.ref_gtf_file is not None:
                 if not os.path.exists(args.ref_gtf_file):
