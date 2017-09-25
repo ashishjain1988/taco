@@ -103,7 +103,7 @@ FULL_GTF_ATTRS = ['gene_id',
                   'annotation',
                   'category',
                   'category_relative',
-                  'cateogry_relative_detail',
+                  'category_relative_detail',
                   'cpat_coding_prob',
                   'orf_size',
                   'ref_transcript_id',
@@ -807,12 +807,7 @@ def impute_transcript_type(catint, length, gene_type, ref_gene_type):
             # categorize small RNA separately
             transcript_type = 'misc_RNA'
         else:
-            if ref_gene_type == 'protein_coding':
-                # categorize based on overlap with reference
-                transcript_type = PROTEIN_CATEGORY_MAP[catint]
-            else:
-                # reference is also non-coding
-                transcript_type = 'lincRNA'
+            transcript_type = 'lincRNA'
     return transcript_type
 
 def parse_and_output_gtf_file(input_gtf_file, tmp_dir, is_ref, num_cores):
@@ -955,7 +950,7 @@ def compare_assemblies_worker(input_queue):
                         t.attrs['category'] = consensus_match.category
                         # add gtf attributes and write
                         for f in t.to_gtf_features(source='assembly'):
-                            if t.attrs['category'] in ['same_strand', 'read_through']:
+                            if t.attrs['category'] != 'intergenic':
                                 consensus_match.add_gtf_attributes(f)
                             print >>gtf_fileh, str(f)
                         # tab-delimited text output
