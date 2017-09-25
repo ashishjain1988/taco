@@ -119,7 +119,9 @@ class GTF:
                     if not a.strip():
                         continue
                     # key-value pair separated by whitespace
-                    k, v = a.strip().split()
+                    a = a.strip().split(' ')
+                    k = a[0]
+                    v = ' '.join(a[1:])
                     # remove quotes
                     v = v.strip('"')
                     attrs[k] = v

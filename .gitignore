@@ -27,3 +27,6 @@ taco/lib/cbedgraph.c
 taco_compare
 taco_refcomp
 taco_run
+path_init.sh
+gencode.v25.annotation.gtf
+output/
