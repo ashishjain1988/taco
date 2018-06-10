@@ -19,11 +19,11 @@ from taco.lib.transfrag import Transfrag
 from taco.lib.pysam.cfaidx import FastaFile
 
 
-__author__ = "Matthew Iyer and Yashar Niknafs"
-__copyright__ = "Copyright 2016"
-__credits__ = ["Matthew Iyer", "Yashar Niknafs"]
-__license__ = "GPL"
-__version__ = "0.4.5"
+__author__ = "Matthew Iyer, Yashar Niknafs, and Balaji Pandian"
+__copyright__ = "Copyright 2012-2018"
+__credits__ = ["Matthew Iyer", "Yashar Niknafs", "Balaji Pandian"]
+__license__ = "MIT"
+__version__ = "0.7.3"
 __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"

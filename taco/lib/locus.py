@@ -11,14 +11,13 @@ from cbedgraph import array_to_bedgraph
 from splice_graph import SpliceGraph
 
 __author__ = "Matthew Iyer, Yashar Niknafs, and Balaji Pandian"
-__copyright__ = "Copyright 2012-2017"
+__copyright__ = "Copyright 2012-2018"
 __credits__ = ["Matthew Iyer", "Yashar Niknafs", "Balaji Pandian"]
-__license__ = "GPL"
-__version__ = "0.6.2"
+__license__ = "MIT"
+__version__ = "0.7.3"
 __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
-
 
 def _find_boundaries(transfrags):
     chrom = None
